@@ -1,0 +1,172 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Alice Johnson",
+      "email": "alice@example.com",
+      "age": 28,
+      "department": "Engineering",
+      "salary": 95000,
+      "join_date": "2020-03-15",
+      "active": true,
+      "skills": ["Python", "JavaScript", "React"],
+      "projects": [
+        { "name": "WebApp", "status": "completed", "duration_months": 6 },
+        { "name": "API Gateway", "status": "in_progress", "duration_months": 3 }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Bob Smith",
+      "email": "bob@example.com",
+      "age": 35,
+      "department": "Marketing",
+      "salary": 78000,
+      "join_date": "2019-07-22",
+      "active": true,
+      "skills": ["SEO", "Analytics", "Content Marketing"],
+      "projects": [
+        {
+          "name": "Campaign 2024",
+          "status": "completed",
+          "duration_months": 4
+        },
+        { "name": "Brand Refresh", "status": "planning", "duration_months": 8 }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Carol Williams",
+      "email": "carol@example.com",
+      "age": 42,
+      "department": "Engineering",
+      "salary": 120000,
+      "join_date": "2018-01-10",
+      "active": false,
+      "skills": ["Java", "Kubernetes", "AWS", "Go"],
+      "projects": [
+        {
+          "name": "Microservices",
+          "status": "completed",
+          "duration_months": 12
+        },
+        {
+          "name": "DevOps Pipeline",
+          "status": "completed",
+          "duration_months": 5
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "David Brown",
+      "email": "david@gmail.com",
+      "age": 29,
+      "department": "Sales",
+      "salary": 65000,
+      "join_date": "2021-09-05",
+      "active": true,
+      "skills": ["CRM", "Negotiation", "Lead Generation"],
+      "projects": [
+        {
+          "name": "Q4 Sales Drive",
+          "status": "in_progress",
+          "duration_months": 2
+        },
+        {
+          "name": "Client Onboarding",
+          "status": "planning",
+          "duration_months": 6
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Eva Garcia",
+      "email": "eva@example.com",
+      "age": 31,
+      "department": "Design",
+      "salary": 85000,
+      "join_date": "2020-11-18",
+      "active": true,
+      "skills": ["UI/UX", "Figma", "Prototyping", "User Research"],
+      "projects": [
+        {
+          "name": "Mobile App Redesign",
+          "status": "completed",
+          "duration_months": 8
+        },
+        {
+          "name": "Design System",
+          "status": "in_progress",
+          "duration_months": 4
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Frank Wilson",
+      "email": "frank@example.com",
+      "age": 38,
+      "department": "Engineering",
+      "salary": 105000,
+      "join_date": "2017-05-30",
+      "active": true,
+      "skills": ["Python", "Machine Learning", "TensorFlow", "Docker"],
+      "projects": [
+        { "name": "ML Pipeline", "status": "completed", "duration_months": 10 },
+        {
+          "name": "Data Analytics",
+          "status": "in_progress",
+          "duration_months": 6
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Grace Lee",
+      "email": "grace@example.com",
+      "age": 26,
+      "department": "HR",
+      "salary": 58000,
+      "join_date": "2022-02-14",
+      "active": true,
+      "skills": ["Recruitment", "Employee Relations", "Training"],
+      "projects": [
+        {
+          "name": "Onboarding Program",
+          "status": "completed",
+          "duration_months": 3
+        },
+        {
+          "name": "Performance Review",
+          "status": "planning",
+          "duration_months": 5
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Henry Martinez",
+      "email": "henry@gmail.com",
+      "age": 45,
+      "department": "Finance",
+      "salary": 92000,
+      "join_date": "2016-08-12",
+      "active": true,
+      "skills": ["Financial Planning", "Excel", "SAP", "Budgeting"],
+      "projects": [
+        {
+          "name": "Budget 2025",
+          "status": "in_progress",
+          "duration_months": 4
+        },
+        {
+          "name": "Cost Optimization",
+          "status": "planning",
+          "duration_months": 7
+        }
+      ]
+    }
+  ]
+}
