@@ -1,6 +1,7 @@
 use std::{fs::File, io::BufReader};
 
 use anyhow::Result;
+use hawk::Error;
 use serde_json::Value;
 
 fn main() -> Result<()>{
@@ -9,7 +10,7 @@ fn main() -> Result<()>{
     let json: Value = serde_json::from_reader(reader)?;
 
     // `.users[0].name`
-    let query = ".users[0].name";
+    let query = ".users[abc].name";
     let segments = query.split('.').collect::<Vec<&str>>();
     let segment = segments[1]; 
     let param = segments[2];
@@ -27,10 +28,13 @@ fn main() -> Result<()>{
 
     if segment.contains('[') && segment.contains(']') {
         let json_key = segment.get(..idx).unwrap();
-        let index = segment.get(idx + 1..ridx).unwrap().parse::<usize>().unwrap();
+        let index = segment.get(idx + 1..ridx).unwrap().parse::<usize>().map_err(|e| {
+            Error::StrToInt(e)
+        })?;
+
 
         // debug
-        println!("{}", json_key);
+        println!("{:?}", json_key);
         println!("{:?}", index);
 
         let values = json.get(json_key).unwrap();
