@@ -15,5 +15,5 @@ pub enum Error {
     InvalidQuery(String),
 
     #[error("Array index out of bounds: {0}")]
-    IndexOufOfBounds(usize),
+    IndexOutOfBounds(usize),
 }
