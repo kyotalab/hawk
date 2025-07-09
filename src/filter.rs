@@ -1,9 +1,9 @@
 use serde_json::Value;
 
-use crate::{value_to_string, Error};
+use crate::Error;
 
 
-pub fn apply_simple_filter(data: Vec<Value>, filter: &str) -> Result<Vec<String>, Error> {
+pub fn apply_simple_filter(data: Vec<Value>, filter: &str) -> Result<Vec<Value>, Error> {
     if filter.starts_with("select(") && filter.ends_with(")") {
         // "select(.age > 30)" から ".age > 30" を抽出
         let condition = &filter[7..filter.len()-1];
@@ -12,9 +12,8 @@ pub fn apply_simple_filter(data: Vec<Value>, filter: &str) -> Result<Vec<String>
         let (field_path, operator, value) = parse_condition(condition)?;
         
         // フィルタリングを実行
-        let filtered: Vec<String> = data.into_iter()
+        let filtered: Vec<Value> = data.into_iter()
             .filter(|item| evaluate_condition(item, &field_path, &operator, &value))
-            .map(|item| value_to_string(&item))
             .collect();
         
         Ok(filtered)

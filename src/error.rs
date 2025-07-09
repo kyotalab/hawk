@@ -2,6 +2,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Invalid output format: {0}")]
+    InvalidFormat(String),
+
     #[error("File not found: {0}")]
     FileNotFound(#[from] std::io::Error), // std::io::Error から自動変換
 
