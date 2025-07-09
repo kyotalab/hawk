@@ -36,6 +36,77 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         // info操作
         print_data_info(&data);
         Ok(vec![]) // 空のVecを返す
+    // apply_pipeline_operation に追加
+    } else if operation.starts_with("sum(") && operation.ends_with(")") {
+        // sum(.field) の処理
+        let field = &operation[4..operation.len()-1]; // ".salary"
+        let field_name = field.trim_start_matches('.'); // "salary"
+        
+        let sum: f64 = data.iter()
+            .filter_map(|item| item.get(field_name))
+            .filter_map(|val| val.as_f64())
+            .sum();
+        
+        let round_sum = if sum.fract() == 0.0 {
+            sum
+        } else {
+            (sum * 10.0).round() / 10.0
+        };
+        let sum_value = Value::Number(serde_json::Number::from_f64(round_sum).unwrap());
+        Ok(vec![sum_value])
+        
+    } else if operation.starts_with("avg(") && operation.ends_with(")") {
+        // avg(.field) の処理
+        let field = &operation[4..operation.len()-1];
+        let field_name = field.trim_start_matches('.');
+        
+        let values: Vec<f64> = data.iter()
+            .filter_map(|item| item.get(field_name))
+            .filter_map(|val| val.as_f64())
+            .collect();
+        
+        if values.is_empty() {
+            Ok(vec![Value::Null])
+        } else {
+            let avg = values.iter().sum::<f64>() / values.len() as f64;
+            let round_avg = (avg * 10.0).round() / 10.0;
+            let avg_value = Value::Number(serde_json::Number::from_f64(round_avg).unwrap());
+            Ok(vec![avg_value])
+        }
+
+    } else if operation.starts_with("min(") && operation.ends_with(")") {
+        // min(.field) の処理
+        let field = &operation[4..operation.len()-1];
+        let field_name = field.trim_start_matches('.');
+        
+        let min_val = data.iter()
+            .filter_map(|item| item.get(field_name))
+            .filter_map(|val| val.as_f64())
+            .fold(f64::INFINITY, f64::min);
+        
+        if min_val == f64::INFINITY {
+            Ok(vec![Value::Null])
+        } else {
+            let min_value = Value::Number(serde_json::Number::from_f64(min_val).unwrap());
+            Ok(vec![min_value])
+        }
+
+    } else if operation.starts_with("max(") && operation.ends_with(")") {
+        // max(.field) の処理
+        let field = &operation[4..operation.len()-1];
+        let field_name = field.trim_start_matches('.');
+        
+        let max_val = data.iter()
+            .filter_map(|item| item.get(field_name))
+            .filter_map(|val| val.as_f64())
+            .fold(f64::NEG_INFINITY, f64::max);
+        
+        if max_val == f64::NEG_INFINITY {
+            Ok(vec![Value::Null])
+        } else {
+            let max_value = Value::Number(serde_json::Number::from_f64(max_val).unwrap());
+            Ok(vec![max_value])
+        }
     } else {
         Err(Error::InvalidQuery(format!("Unsupported operation: {}", operation)))
     }
