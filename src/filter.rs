@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::Error;
+use crate::{print_data_info, Error};
 
 
 pub fn apply_simple_filter(data: Vec<Value>, filter: &str) -> Result<Vec<Value>, Error> {
@@ -17,6 +17,9 @@ pub fn apply_simple_filter(data: Vec<Value>, filter: &str) -> Result<Vec<Value>,
             .collect();
         
         Ok(filtered)
+    } else if filter == "info" {
+        print_data_info(&data);
+        Ok(vec![])
     } else {
         Err(Error::InvalidQuery(format!("Unsupported filter: {}", filter)))
     }

@@ -1,6 +1,9 @@
 use crate::Error;
 
 pub fn parse_query_segments(query: &str) -> Result<(&str, Vec<&str>), Error> {
+    if query == "." {
+        return Ok(("", vec![]));
+    }
     let mut segments = query.split('.').skip(1);
     let segment = segments.next().ok_or(Error::InvalidQuery("Missing field segment in query".into()))?;
     let fields: Vec<&str> = segments.collect();

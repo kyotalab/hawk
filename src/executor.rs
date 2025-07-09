@@ -23,7 +23,6 @@ pub fn execute_query(json: &Value, query: &str, format: OutputFormat) -> Result<
 
 fn format_output(data: &[Value], format: OutputFormat) -> Result<(), Error> {
     if data.is_empty() {
-        println!("data not found");
         return Ok(());
     }
 
@@ -272,6 +271,10 @@ pub fn execute_basic_query(json: &Value, query: &str) -> Result<Vec<String>, Err
 pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Value>, Error> {
     let (segment, fields) = parse_query_segments(query)?;
 
+    if segment.is_empty() && fields.is_empty() {
+        return Ok(vec![json.clone()]);
+    }
+
     if segment.contains('[') && segment.contains(']') {
         let (idx, ridx) = parse_array_segment(segment)?;
         let key = segment.get(..idx).ok_or(Error::InvalidQuery("Invalid segment format".into()))?;
@@ -438,6 +441,96 @@ pub fn handle_array_access(json: &Value, key: &str, fields: Vec<&str>) -> Result
     Ok(res)
 }
 
+
+// 新しいパイプライン操作として追加
+pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec<String>, Error> {
+    match operation {
+        "info" => {
+            print_data_info(&data);
+            Ok(vec![]) // info は情報表示のみで結果は返さない
+        }
+        operation if operation.starts_with("select(") => {
+            // 既存のフィルタ処理
+            let filtered = apply_simple_filter(data, operation)?;
+            Ok(filtered.into_iter().map(|v| value_to_string(&v)).collect())
+        }
+        _ => Err(Error::InvalidQuery(format!("Unknown operation: {}", operation)))
+    }
+}
+
+pub fn print_data_info(data: &[Value]) {
+    println!("=== Data Information ===");
+    println!("Total records: {}", data.len());
+    
+    if data.is_empty() {
+        return;
+    }
+    
+    // データ型の分析
+    let first_item = &data[0];
+    match first_item {
+        Value::Object(obj) => {
+            println!("Type: Object Array");
+            println!("Fields: {}", obj.len());
+            println!();
+            
+            // フィールド一覧と型情報
+            println!("Field Details:");
+            for (key, value) in obj {
+                let field_type = get_value_type_info(value);
+                let sample_value = get_sample_value(value);
+                println!("  {:<15} {:<10} (e.g., {})", key, field_type, sample_value);
+            }
+            
+            // 配列フィールドの詳細
+            println!();
+            println!("Array Fields:");
+            for (key, value) in obj {
+                if let Value::Array(arr) = value {
+                    println!("  {:<15} [{} items]", key, arr.len());
+                    if let Some(first_elem) = arr.get(0) {
+                        if let Value::Object(elem_obj) = first_elem {
+                            print!("    └─ ");
+                            let sub_fields: Vec<&String> = elem_obj.keys().collect();
+                            let sub_fields: Vec<&str> = sub_fields.into_iter().map(|f| f.as_str()).collect();
+                            println!("{}", sub_fields.join(", "));
+                        }
+                    }
+                }
+            }
+        }
+        Value::Array(_) => {
+            println!("Type: Nested Array");
+            // ネストした配列の詳細
+        }
+        _ => {
+            println!("Type: Simple Values");
+            // プリミティブ値の統計
+        }
+    }
+}
+
+fn get_value_type_info(value: &Value) -> &'static str {
+    match value {
+        Value::String(_) => "String",
+        Value::Number(_) => "Number", 
+        Value::Bool(_) => "Boolean",
+        Value::Array(_) => "Array",
+        Value::Object(_) => "Object",
+        Value::Null => "Null",
+    }
+}
+
+fn get_sample_value(value: &Value) -> String {
+    match value {
+        Value::String(s) => format!("\"{}\"", s.chars().take(20).collect::<String>()),
+        Value::Number(n) => n.to_string(),
+        Value::Bool(b) => b.to_string(),
+        Value::Array(arr) => format!("[{} items]", arr.len()),
+        Value::Object(obj) => format!("{{{}...}}", obj.keys().next().unwrap_or(&"".to_string())),
+        Value::Null => "null".to_string(),
+    }
+}
 
 #[cfg(test)]
 mod tests {
