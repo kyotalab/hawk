@@ -3,12 +3,7 @@ use crate::Error;
 pub fn parse_query_segments(query: &str) -> Result<(&str, Vec<&str>), Error> {
     let mut segments = query.split('.').skip(1);
     let segment = segments.next().ok_or(Error::InvalidQuery("Missing field segment in query".into()))?;
-
     let fields: Vec<&str> = segments.collect();
-
-//     if fields.is_empty() {
-//         return Err(Error::InvalidQuery("Missing parameter segment in query".into()));
-//     }
 
     Ok((segment, fields))
 }

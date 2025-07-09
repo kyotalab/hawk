@@ -1,6 +1,7 @@
 pub mod arg;
 pub mod error;
 pub mod executor;
+pub mod filter;
 pub mod parser;
 pub mod utils;
 
@@ -10,6 +11,7 @@ pub use arg::*;
 use clap::Parser;
 pub use error::*;
 pub use executor::*;
+pub use filter::*;
 pub use parser::*;
 use serde_json::Value;
 pub use utils::*;

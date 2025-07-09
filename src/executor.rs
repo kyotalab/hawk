@@ -1,9 +1,28 @@
 use serde_json::Value;
 
-use crate::{parse_array_segment, parse_query_segments, value_to_string, Error};
-
+use crate::{apply_simple_filter, parse_array_segment, parse_query_segments, value_to_string, Error};
 
 pub fn execute_query(json: &Value, query: &str) -> Result<Vec<String>, Error> {
+    if query.contains('|') {
+        // パイプライン処理
+        let parts: Vec<&str> = query.split('|').map(|s| s.trim()).collect();
+        let data_query = parts[0];
+        let filter_query = parts[1];
+
+        let data = execute_basic_query_as_json(json, data_query)?;
+
+        let filtered = apply_simple_filter(data, filter_query)?;
+
+        Ok(filtered)
+
+
+    } else {
+        let result = execute_basic_query(json, query)?;
+        Ok(result)
+    }
+}
+
+pub fn execute_basic_query(json: &Value, query: &str) -> Result<Vec<String>, Error> {
     let (segment, fields) = parse_query_segments(query)?;
     // debug
     // println!("{}", segment);
@@ -33,6 +52,103 @@ pub fn execute_query(json: &Value, query: &str) -> Result<Vec<String>, Error> {
     }
 }
 
+pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Value>, Error> {
+    let (segment, fields) = parse_query_segments(query)?;
+
+    if segment.contains('[') && segment.contains(']') {
+        let (idx, ridx) = parse_array_segment(segment)?;
+        let key = segment.get(..idx).ok_or(Error::InvalidQuery("Invalid segment format".into()))?;
+        let index_str = segment.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
+        
+        if index_str.is_empty() {
+            // 配列全体を返す
+            let result = handle_array_access_as_json(json, key, fields)?;
+            Ok(result)
+        } else {
+            // 単一要素を返す
+            let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
+            let result = handle_single_access_as_json(json, key, index, fields)?;
+            Ok(vec![result]) // 単一要素も配列として返す
+        }
+    } else {
+        let result = handle_array_access_as_json(json, segment, fields)?;
+        Ok(result)
+    }
+}
+
+pub fn handle_single_access_as_json(json: &Value, key: &str, index: usize, fields: Vec<&str>) -> Result<Value, Error> {
+    let values = json.get(key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
+    let mut current = values.get(index).ok_or(Error::IndexOutOfBounds(index))?;
+
+    // fieldsを順次辿る（handle_single_accessと同じロジック）
+    for field in fields {
+        if field.contains('[') && field.contains(']') {
+            // 配列アクセスの場合
+            let (idx, ridx) = parse_array_segment(field)?;
+            let field_key = field.get(..idx).ok_or(Error::InvalidQuery("Invalid field".into()))?;
+            let index_str = field.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
+            let field_index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
+            
+            // field_key でアクセスしてから、field_index でアクセス
+            let array = current.get(field_key).ok_or(Error::InvalidQuery(format!("Field '{}' not found", field_key)))?;
+            current = array.get(field_index).ok_or(Error::IndexOutOfBounds(field_index))?;
+        } else {
+            // 通常のフィールドアクセス
+            current = current.get(field).ok_or(Error::InvalidQuery(format!("Field '{}' not found", field)))?;
+        }
+    }
+
+    // value_to_stringではなく、Valueのまま返す
+    Ok(current.clone())
+}
+
+pub fn handle_array_access_as_json(json: &Value, key: &str, fields: Vec<&str>) -> Result<Vec<Value>, Error> {
+    let values = json.get(key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
+    let values_arr = values.as_array().ok_or(Error::InvalidQuery("Expected array".into()))?;
+
+    let res: Vec<Value> = values_arr.iter()
+        .filter_map(|array_item| {
+            // 各配列要素に対してフィールドパスを辿る（handle_array_accessと同じロジック）
+            let mut current = array_item;
+            
+            for field in &fields {
+                if field.contains('[') && field.contains(']') {
+                    // 配列アクセスの場合
+                    if let Ok((idx, ridx)) = parse_array_segment(field) {
+                        if let Some(field_key) = field.get(..idx) {
+                            if let Some(index_str) = field.get(idx + 1..ridx) {
+                                if let Ok(field_index) = index_str.parse::<usize>() {
+                                    if let Some(array) = current.get(field_key) {
+                                        if let Some(item) = array.get(field_index) {
+                                            current = item;
+                                            continue;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // エラーの場合はこの要素をスキップ
+                    return None;
+                } else {
+                    // 通常のフィールドアクセス
+                    if let Some(next) = current.get(field) {
+                        current = next;
+                    } else {
+                        // フィールドが存在しない場合はこの要素をスキップ
+                        return None;
+                    }
+                }
+            }
+            
+            // value_to_stringではなく、Valueのまま返す
+            Some(current.clone())
+        })
+        .collect();
+
+    Ok(res)
+}
+
 pub fn handle_single_access(json: &Value, key: &str, index: usize, fields: Vec<&str>) -> Result<Vec<String>, Error> {
     // 1. 最初の配列要素を取得
     let values = json.get(key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
@@ -58,6 +174,7 @@ pub fn handle_single_access(json: &Value, key: &str, index: usize, fields: Vec<&
 
     Ok(vec![value_to_string(current)])
 }
+
 pub fn handle_array_access(json: &Value, key: &str, fields: Vec<&str>) -> Result<Vec<String>, Error> {
     let values = json.get(key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
     let values_arr = values.as_array().ok_or(Error::InvalidQuery("Expected array".into()))?;
@@ -103,6 +220,7 @@ pub fn handle_array_access(json: &Value, key: &str, fields: Vec<&str>) -> Result
 
     Ok(res)
 }
+
 
 #[cfg(test)]
 mod tests {
