@@ -1,20 +1,26 @@
-use std::{fs::File, io::BufReader};
+use std::{fs::File, io::{self, BufRead, BufReader}};
 
 use anyhow::Result;
-use hawk::Error;
+use clap::Parser;
+use hawk::{Args, Error};
 use serde_json::Value;
 
 fn main() -> Result<(), Error>{
-    let file = File::open("users.json")?;
-    let reader = BufReader::new(file);
+    let args = Args::parse();
+    let reader: Box<dyn BufRead> = if let Some(path) = args.path {
+        Box::new(BufReader::new(File::open(path)?))
+    } else {
+        Box::new(BufReader::new(io::stdin()))
+    };
+
     let json: Value = serde_json::from_reader(reader)?;
 
     // `.users[0].name`
-    let query = ".users.name";
+    let query = args.query;
     let mut segments = query.split('.');
     segments.next();
-    let segment = segments.next().unwrap(); 
-    let param = segments.next().unwrap();
+    let segment = segments.next().ok_or(Error::InvalidQuery("Missing field segment in query".into()))?; 
+    let param = segments.next().ok_or(Error::InvalidQuery("Missing parameter segment in query".into()))?;
 
     // debug
     // println!("{}", segment);
@@ -44,28 +50,23 @@ fn main() -> Result<(), Error>{
         // println!("{:?}", index);
 
         let values = json.get(json_key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", json_key)))?;
-        let res = &values[index].get(param);
+        let res = values[index].get(param).ok_or(Error::InvalidQuery(format!("Field '{}' not found", param)))?;
 
         // output
-        println!("{:?}", res);
+        println!("{}", res);
 
     } else {
         let json_key = segment;
 
         let values = json.get(json_key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", json_key)))?;
-        let values_arr = values.as_array().unwrap();
+        let values_arr = values.as_array().ok_or(Error::InvalidQuery("Expected array".into()))?;
 
         // debug
         // println!("{:?}", values_arr);
 
-        let mut res = Vec::new();
-
-        for value in values_arr.iter() {
-            res.push(value.get(param).unwrap());
-        }
-
+        // TODO シャドーイング部分を一つのチェーンにしても良いかも
         let res: Vec<_> = values_arr.iter()
-            .map(|value| value.get(param).unwrap())
+            .filter_map(|value| value.get(param))
             .collect();
         
         let res: Vec<String> = res.into_iter()
