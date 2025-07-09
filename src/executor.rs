@@ -16,24 +16,23 @@ pub fn execute_query(json: &Value, query: &str) -> Result<Vec<String>, Error> {
 
         let key = segment.get(..idx).ok_or(Error::InvalidQuery("Invalid segment format".into()))?;
         let index_str = segment.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
-        let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
-
-
-        let result = handle_single_access(json, key, index, fields)?;
-        // debug
-        // println!("{:?}", json_key);
-        // println!("{:?}", index);
-
-        Ok(result)
-
+        
+        if index_str.is_empty() {
+            let result = handle_array_access(json, key, fields)?;
+            Ok(result)
+        } else {
+            
+            let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
+            let result = handle_single_access(json, key, index, fields)?;
+            Ok(result)
+        }
     } else {
         let key = segment;
-
         let result = handle_array_access(json, key, fields)?;
-
         Ok(result)
     }
 }
+
 pub fn handle_single_access(json: &Value, key: &str, index: usize, fields: Vec<&str>) -> Result<Vec<String>, Error> {
     // 1. 最初の配列要素を取得
     let values = json.get(key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
