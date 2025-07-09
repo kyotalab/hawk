@@ -1,12 +1,16 @@
 use crate::Error;
 
-pub fn parse_query_segments(query: &str) -> Result<(&str, &str), Error> {
-    let mut segments = query.split('.');
-    segments.next();
-    let segment = segments.next().ok_or(Error::InvalidQuery("Missing field segment in query".into()))?; 
-    let param = segments.next().ok_or(Error::InvalidQuery("Missing parameter segment in query".into()))?;
+pub fn parse_query_segments(query: &str) -> Result<(&str, Vec<&str>), Error> {
+    let mut segments = query.split('.').skip(1);
+    let segment = segments.next().ok_or(Error::InvalidQuery("Missing field segment in query".into()))?;
 
-    Ok((segment, param))
+    let fields: Vec<&str> = segments.collect();
+
+    if fields.is_empty() {
+        return Err(Error::InvalidQuery("Missing parameter segment in query".into()));
+    }
+
+    Ok((segment, fields))
 }
 
 pub fn parse_array_segment(segment: &str) -> Result<(usize, usize), Error> {
@@ -32,7 +36,7 @@ mod tests {
         assert!(result.is_ok());
         let (segment, field) = result.unwrap();
         assert_eq!(segment, "users");
-        assert_eq!(field, "name");
+        assert_eq!(field, vec!["name"]);
     }
 
     #[test]
@@ -42,7 +46,7 @@ mod tests {
         assert!(result.is_ok());
         let (segment, field) = result.unwrap();
         assert_eq!(segment, "users[0]");
-        assert_eq!(field, "name");
+        assert_eq!(field, vec!["name"]);
     }
 
     #[test]
@@ -52,7 +56,7 @@ mod tests {
         assert!(result.is_ok());
         let (segment, field) = result.unwrap();
         assert_eq!(segment, "products");
-        assert_eq!(field, "price");
+        assert_eq!(field, vec!["price"]);
     }
 
     #[test]
@@ -62,7 +66,7 @@ mod tests {
         assert!(result.is_ok());
         let (segment, field) = result.unwrap();
         assert_eq!(segment, "items[123]");
-        assert_eq!(field, "description");
+        assert_eq!(field, vec!["description"]);
     }
 
     #[test]
@@ -131,14 +135,23 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_query_segments_too_many_segments() {
-        // エラーケース: セグメントが多すぎる（現在の実装では3番目以降は無視される）
-        // このテストは現在の実装の動作を確認
+    fn test_parse_query_segments_multiple_segments() {
+        // 修正: 複数セグメントは正常に処理される
         let result = parse_query_segments(".users.name.extra");
-        assert!(result.is_ok()); // 現在は成功する（3番目は無視）
-        let (segment, field) = result.unwrap();
+        assert!(result.is_ok()); 
+        let (segment, fields) = result.unwrap();
         assert_eq!(segment, "users");
-        assert_eq!(field, "name");
+        assert_eq!(fields, vec!["name", "extra"]); // 3番目も含まれる
+    }
+
+    #[test]
+    fn test_parse_query_segments_many_segments() {
+        // さらに多くのセグメント
+        let result = parse_query_segments(".a.b.c.d.e");
+        assert!(result.is_ok());
+        let (segment, fields) = result.unwrap();
+        assert_eq!(segment, "a");
+        assert_eq!(fields, vec!["b", "c", "d", "e"]);
     }
 
     #[test]
