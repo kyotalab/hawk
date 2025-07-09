@@ -17,11 +17,27 @@ pub fn apply_simple_filter(data: Vec<Value>, filter: &str) -> Result<Vec<Value>,
             .collect();
         
         Ok(filtered)
-    } else if filter == "info" {
-        print_data_info(&data);
-        Ok(vec![])
     } else {
         Err(Error::InvalidQuery(format!("Unsupported filter: {}", filter)))
+    }
+}
+
+// filter.rs に追加
+pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec<Value>, Error> {
+    if operation.starts_with("select(") && operation.ends_with(")") {
+        // フィルタリング操作
+        apply_simple_filter(data, operation)
+    } else if operation == "count" {
+        // カウント操作
+        let count = data.len();
+        let count_value = Value::Number(serde_json::Number::from(count));
+        Ok(vec![count_value])
+    } else if operation == "info" {
+        // info操作
+        print_data_info(&data);
+        Ok(vec![]) // 空のVecを返す
+    } else {
+        Err(Error::InvalidQuery(format!("Unsupported operation: {}", operation)))
     }
 }
 

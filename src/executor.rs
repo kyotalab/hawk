@@ -1,23 +1,33 @@
 use indexmap::IndexSet;
 use serde_json::Value;
 
-use crate::{apply_simple_filter, parse_array_segment, parse_query_segments, value_to_string, Error, OutputFormat};
+use crate::{apply_pipeline_operation, parse_array_segment, parse_query_segments, value_to_string, Error, OutputFormat};
 
 pub fn execute_query(json: &Value, query: &str, format: OutputFormat) -> Result<(), Error> {
-    let result_data = if query.contains('|') {
-        // パイプライン処理
+    if query.contains('|') {
+        // 複数パイプライン処理
         let parts: Vec<&str> = query.split('|').map(|s| s.trim()).collect();
-        let data_query = parts[0];
-        let filter_query = parts[1];
-
-        let data = execute_basic_query_as_json(json, data_query)?;
-
-        apply_simple_filter(data, filter_query)?
+        
+        if parts.len() < 2 {
+            return Err(Error::InvalidQuery("Invalid pipeline syntax".into()));
+        }
+        
+        // 最初のクエリでデータを取得
+        let initial_query = parts[0];
+        let mut current_data = execute_basic_query_as_json(json, initial_query)?;
+        
+        // 残りのパイプライン操作を順次実行
+        for operation in &parts[1..] {
+            current_data = apply_pipeline_operation(current_data, &operation)?;
+        }
+        
+        // 最終結果の出力
+        format_output(&current_data, format)?;
     } else {
-        execute_basic_query_as_json(json, query)?
-    };
-
-    format_output(&result_data, format)?;
+        let result_data = execute_basic_query_as_json(json, query)?;
+        format_output(&result_data, format)?;
+    }
+    
     Ok(())
 }
 
@@ -441,22 +451,6 @@ pub fn handle_array_access(json: &Value, key: &str, fields: Vec<&str>) -> Result
     Ok(res)
 }
 
-
-// 新しいパイプライン操作として追加
-pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec<String>, Error> {
-    match operation {
-        "info" => {
-            print_data_info(&data);
-            Ok(vec![]) // info は情報表示のみで結果は返さない
-        }
-        operation if operation.starts_with("select(") => {
-            // 既存のフィルタ処理
-            let filtered = apply_simple_filter(data, operation)?;
-            Ok(filtered.into_iter().map(|v| value_to_string(&v)).collect())
-        }
-        _ => Err(Error::InvalidQuery(format!("Unknown operation: {}", operation)))
-    }
-}
 
 pub fn print_data_info(data: &[Value]) {
     println!("=== Data Information ===");
