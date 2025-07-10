@@ -10,7 +10,10 @@ pub enum Error {
 
     #[error("JSON deserialization error: {0}")]
     Json(#[from] serde_json::Error), // serde_json::Error から自動変換
-    
+
+    #[error("YAML deserialization error: {0}")]
+    Yaml(#[from] serde_yaml::Error), // serde_yaml::Error から自動変換
+
     #[error("str parse int error: {0}")]
     StrToInt(#[from] std::num::ParseIntError), // std::num::ParseIntError からの自動変換
 

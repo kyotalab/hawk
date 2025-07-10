@@ -10,4 +10,5 @@ indexmap = { version = "2.10.0", features = ["serde"] }
 regex = "1.11.1"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0.140", features = ["preserve_order"] }
+serde_yaml = "0.9.34"
 thiserror = "2.0.12"

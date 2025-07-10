@@ -7,27 +7,27 @@ pub fn execute_query(json: &Value, query: &str, format: OutputFormat) -> Result<
     if query.contains('|') {
         // 複数パイプライン処理
         let parts: Vec<&str> = query.split('|').map(|s| s.trim()).collect();
-        
+
         if parts.len() < 2 {
             return Err(Error::InvalidQuery("Invalid pipeline syntax".into()));
         }
-        
+
         // 最初のクエリでデータを取得
         let initial_query = parts[0];
         let mut current_data = execute_basic_query_as_json(json, initial_query)?;
-        
+
         // 残りのパイプライン操作を順次実行
         for operation in &parts[1..] {
             current_data = apply_pipeline_operation(current_data, &operation)?;
         }
-        
+
         // 最終結果の出力
         format_output(&current_data, format)?;
     } else {
         let result_data = execute_basic_query_as_json(json, query)?;
         format_output(&result_data, format)?;
     }
-    
+
     Ok(())
 }
 
@@ -77,7 +77,7 @@ fn format_output(data: &[Value], format: OutputFormat) -> Result<(), Error> {
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -94,22 +94,22 @@ fn analyze_data_structure(data: &[Value]) -> DataType {
     if is_simple_values(data) {
         return DataType::SimpleList;
     }
-    
+
     if is_object_array(data) {
         return DataType::ObjectArray;
     }
-    
+
     // ネストした配列かチェック
     if data.len() == 1 && data[0].is_array() {
         return DataType::NestedArray;
     }
-    
+
     DataType::Mixed
 }
 
 fn flatten_nested_arrays(data: &[Value]) -> Vec<Value> {
     let mut flattened = Vec::new();
-    
+
     for item in data {
         match item {
             Value::Array(arr) => {
@@ -121,7 +121,7 @@ fn flatten_nested_arrays(data: &[Value]) -> Vec<Value> {
             }
         }
     }
-    
+
     flattened
 }
 
@@ -144,23 +144,23 @@ fn print_as_table(data: &[Value]) {
     if data.is_empty() {
         return;
     }
-    
+
     // 1. 全オブジェクトからフラット化されたフィールド名を収集
     let mut all_fields = IndexSet::new();
     for item in data {
         collect_flattened_fields_ordered(item, "", &mut all_fields);
     }
-    
+
     let fields: Vec<String> = all_fields.into_iter().collect();
-    
+
     // 2. 各列の最大幅を計算
     let mut max_widths = vec![0; fields.len()];
-    
+
     // ヘッダーの幅
     for (i, field) in fields.iter().enumerate() {
         max_widths[i] = field.len();
     }
-    
+
     // データの幅
     for item in data {
         for (i, field) in fields.iter().enumerate() {
@@ -168,7 +168,7 @@ fn print_as_table(data: &[Value]) {
             max_widths[i] = max_widths[i].max(value_str.len());
         }
     }
-    
+
     // 3. ヘッダー出力
     for (i, field) in fields.iter().enumerate() {
         print!("{:<width$}", field, width = max_widths[i]);
@@ -177,7 +177,7 @@ fn print_as_table(data: &[Value]) {
         }
     }
     println!();
-    
+
     // 4. データ行出力
     for item in data {
         for (i, field) in fields.iter().enumerate() {
@@ -200,7 +200,7 @@ fn collect_flattened_fields_ordered(value: &Value, prefix: &str, fields: &mut In
                 } else {
                     format!("{}.{}", prefix, key)
                 };
-                
+
                 match val {
                     Value::Object(_) => {
                         collect_flattened_fields_ordered(val, &field_name, fields);
@@ -223,14 +223,14 @@ fn collect_flattened_fields_ordered(value: &Value, prefix: &str, fields: &mut In
 fn get_flattened_value(item: &Value, field_path: &str) -> String {
     let parts: Vec<&str> = field_path.split('.').collect();
     let mut current = item;
-    
+
     for part in parts {
         match current.get(part) {
             Some(val) => current = val,
             None => return "".to_string(),
         }
     }
-    
+
     match current {
         Value::Array(arr) => {
             // 配列は簡略表示
@@ -261,12 +261,12 @@ pub fn execute_basic_query(json: &Value, query: &str) -> Result<Vec<String>, Err
 
         let key = segment.get(..idx).ok_or(Error::InvalidQuery("Invalid segment format".into()))?;
         let index_str = segment.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
-        
+
         if index_str.is_empty() {
             let result = handle_array_access(json, key, fields)?;
             Ok(result)
         } else {
-            
+
             let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
             let result = handle_single_access(json, key, index, fields)?;
             Ok(result)
@@ -285,11 +285,36 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
         return Ok(vec![json.clone()]);
     }
 
+    // ルート配列アクセス（.[0] のような場合）
+    if segment.is_empty() && !fields.is_empty() {
+        let first_field = fields[0];
+
+        // [0] のような配列インデックスかチェック
+        if first_field.starts_with('[') && first_field.ends_with(']') {
+            let index_str = &first_field[1..first_field.len()-1];
+            let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
+
+            if let Value::Array(arr) = json {
+                let item = arr.get(index).ok_or(Error::IndexOutOfBounds(index))?;
+
+                // 残りのフィールドがある場合
+                if fields.len() > 1 {
+                    let remaining_fields = fields[1..].to_vec();
+                    return handle_nested_field_access(item, remaining_fields);
+                } else {
+                    return Ok(vec![item.clone()]);
+                }
+            } else {
+                return Err(Error::InvalidQuery("Cannot index non-array value".into()));
+            }
+        }
+    }
+
     if segment.contains('[') && segment.contains(']') {
         let (idx, ridx) = parse_array_segment(segment)?;
         let key = segment.get(..idx).ok_or(Error::InvalidQuery("Invalid segment format".into()))?;
         let index_str = segment.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
-        
+
         if index_str.is_empty() {
             // 配列全体を返す
             let result = handle_array_access_as_json(json, key, fields)?;
@@ -306,6 +331,26 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
     }
 }
 
+fn handle_nested_field_access(value: &Value, fields: Vec<&str>) -> Result<Vec<Value>, Error> {
+    let mut current = value;
+
+    for field in fields {
+        if field.contains('[') && field.contains(']') {
+            let (idx, ridx) = parse_array_segment(field)?;
+            let field_key = field.get(..idx).ok_or(Error::InvalidQuery("Invalid field".into()))?;
+            let index_str = field.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
+            let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
+
+            let array = current.get(field_key).ok_or(Error::InvalidQuery(format!("Field '{}' not found", field_key)))?;
+            current = array.get(index).ok_or(Error::IndexOutOfBounds(index))?;
+        } else {
+            current = current.get(field).ok_or(Error::InvalidQuery(format!("Field '{}' not found", field)))?;
+        }
+    }
+
+    Ok(vec![current.clone()])
+}
+
 pub fn handle_single_access_as_json(json: &Value, key: &str, index: usize, fields: Vec<&str>) -> Result<Value, Error> {
     let values = json.get(key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
     let mut current = values.get(index).ok_or(Error::IndexOutOfBounds(index))?;
@@ -318,7 +363,7 @@ pub fn handle_single_access_as_json(json: &Value, key: &str, index: usize, field
             let field_key = field.get(..idx).ok_or(Error::InvalidQuery("Invalid field".into()))?;
             let index_str = field.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
             let field_index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
-            
+
             // field_key でアクセスしてから、field_index でアクセス
             let array = current.get(field_key).ok_or(Error::InvalidQuery(format!("Field '{}' not found", field_key)))?;
             current = array.get(field_index).ok_or(Error::IndexOutOfBounds(field_index))?;
@@ -340,7 +385,7 @@ pub fn handle_array_access_as_json(json: &Value, key: &str, fields: Vec<&str>) -
         .filter_map(|array_item| {
             // 各配列要素に対してフィールドパスを辿る（handle_array_accessと同じロジック）
             let mut current = array_item;
-            
+
             for field in &fields {
                 if field.contains('[') && field.contains(']') {
                     // 配列アクセスの場合
@@ -370,7 +415,7 @@ pub fn handle_array_access_as_json(json: &Value, key: &str, fields: Vec<&str>) -
                     }
                 }
             }
-            
+
             // value_to_stringではなく、Valueのまま返す
             Some(current.clone())
         })
@@ -392,7 +437,7 @@ pub fn handle_single_access(json: &Value, key: &str, index: usize, fields: Vec<&
             let field_key = field.get(..idx).ok_or(Error::InvalidQuery("Invalid field".into()))?;
             let index_str = field.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
             let field_index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
-            
+
             // field_key でアクセスしてから、field_index でアクセス
             let array = current.get(field_key).ok_or(Error::InvalidQuery(format!("Field '{}' not found", field_key)))?;
             current = array.get(field_index).ok_or(Error::IndexOutOfBounds(field_index))?;
@@ -413,7 +458,7 @@ pub fn handle_array_access(json: &Value, key: &str, fields: Vec<&str>) -> Result
         .filter_map(|array_item| {
             // 各配列要素に対してフィールドパスを辿る
             let mut current = array_item;
-            
+
             for field in &fields {
                 if field.contains('[') && field.contains(']') {
                     // 配列アクセスの場合
@@ -443,7 +488,7 @@ pub fn handle_array_access(json: &Value, key: &str, fields: Vec<&str>) -> Result
                     }
                 }
             }
-            
+
             Some(value_to_string(current))
         })
         .collect();
@@ -455,11 +500,11 @@ pub fn handle_array_access(json: &Value, key: &str, fields: Vec<&str>) -> Result
 pub fn print_data_info(data: &[Value]) {
     println!("=== Data Information ===");
     println!("Total records: {}", data.len());
-    
+
     if data.is_empty() {
         return;
     }
-    
+
     // データ型の分析
     let first_item = &data[0];
     match first_item {
@@ -467,7 +512,7 @@ pub fn print_data_info(data: &[Value]) {
             println!("Type: Object Array");
             println!("Fields: {}", obj.len());
             println!();
-            
+
             // フィールド一覧と型情報
             println!("Field Details:");
             for (key, value) in obj {
@@ -475,7 +520,7 @@ pub fn print_data_info(data: &[Value]) {
                 let sample_value = get_sample_value(value);
                 println!("  {:<15} {:<10} (e.g., {})", key, field_type, sample_value);
             }
-            
+
             // 配列フィールドの詳細
             println!();
             println!("Array Fields:");
@@ -507,7 +552,7 @@ pub fn print_data_info(data: &[Value]) {
 fn get_value_type_info(value: &Value) -> &'static str {
     match value {
         Value::String(_) => "String",
-        Value::Number(_) => "Number", 
+        Value::Number(_) => "Number",
         Value::Bool(_) => "Boolean",
         Value::Array(_) => "Array",
         Value::Object(_) => "Object",
@@ -552,7 +597,7 @@ mod tests {
         // 正常ケース: 基本的な配列アクセス
         let json = create_test_json();
         let result = handle_array_access(&json, "users", vec!["name"]);
-        
+
         assert!(result.is_ok());
         let names = result.unwrap();
         assert_eq!(names, vec!["Alice", "Bob", "Carol"]);
@@ -563,7 +608,7 @@ mod tests {
         // 正常ケース: 一部の要素にフィールドがない（filter_mapで対応）
         let json = create_test_json();
         let result = handle_array_access(&json, "users", vec!["active"]);
-        
+
         assert!(result.is_ok());
         let actives = result.unwrap();
         assert_eq!(actives, vec!["true", "false"]); // Carolにはactiveフィールドがない
@@ -574,7 +619,7 @@ mod tests {
         // 正常ケース: 異なる型のフィールド
         let json = create_test_json();
         let result = handle_array_access(&json, "users", vec!["age"]);
-        
+
         assert!(result.is_ok());
         let ages = result.unwrap();
         assert_eq!(ages, vec!["30", "25", "35"]);
@@ -585,7 +630,7 @@ mod tests {
         // 正常ケース: 空の配列
         let json = create_test_json();
         let result = handle_array_access(&json, "empty_array", vec!["name"]);
-        
+
         assert!(result.is_ok());
         let names = result.unwrap();
         assert!(names.is_empty());
@@ -596,7 +641,7 @@ mod tests {
         // エラーケース: 存在しないキー
         let json = create_test_json();
         let result = handle_array_access(&json, "nonexistent", vec!["name"]);
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
             Error::InvalidQuery(msg) => {
@@ -626,7 +671,7 @@ mod tests {
         // 正常ケース: どの要素にもフィールドがない
         let json = create_test_json();
         let result = handle_array_access(&json, "users", vec!["nonexistent_field"]);
-        
+
         assert!(result.is_ok());
         let values = result.unwrap();
         assert!(values.is_empty()); // filter_mapで空になる
@@ -637,7 +682,7 @@ mod tests {
         // 正常ケース: 基本的な単一要素アクセス
         let json = create_test_json();
         let result = handle_single_access(&json, "users", 0, vec!["name"]);
-        
+
         assert!(result.is_ok());
         let names = result.unwrap();
         assert_eq!(names, vec!["Alice"]);
@@ -648,7 +693,7 @@ mod tests {
         // 正常ケース: 異なるインデックス
         let json = create_test_json();
         let result = handle_single_access(&json, "users", 1, vec!["name"]);
-        
+
         assert!(result.is_ok());
         let names = result.unwrap();
         assert_eq!(names, vec!["Bob"]);
@@ -659,7 +704,7 @@ mod tests {
         // 正常ケース: 異なるフィールド
         let json = create_test_json();
         let result = handle_single_access(&json, "users", 0, vec!["age"]);
-        
+
         assert!(result.is_ok());
         let ages = result.unwrap();
         assert_eq!(ages, vec!["30"]);
@@ -670,7 +715,7 @@ mod tests {
         // 正常ケース: Boolean型のフィールド
         let json = create_test_json();
         let result = handle_single_access(&json, "users", 0, vec!["active"]);
-        
+
         assert!(result.is_ok());
         let actives = result.unwrap();
         assert_eq!(actives, vec!["true"]);
@@ -681,7 +726,7 @@ mod tests {
         // エラーケース: 存在しないキー
         let json = create_test_json();
         let result = handle_single_access(&json, "nonexistent", 0, vec!["name"]);
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
             Error::InvalidQuery(msg) => {
@@ -696,7 +741,7 @@ mod tests {
         // エラーケース: 配列の範囲外インデックス
         let json = create_test_json();
         let result = handle_single_access(&json, "users", 999, vec!["name"]);
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
             Error::IndexOutOfBounds(index) => {
@@ -711,7 +756,7 @@ mod tests {
         // エラーケース: 存在しないフィールド
         let json = create_test_json();
         let result = handle_single_access(&json, "users", 0, vec!["nonexistent_field"]);
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
             Error::InvalidQuery(msg) => {
@@ -726,7 +771,7 @@ mod tests {
         // エラーケース: 配列ではない値へのインデックスアクセス
         let json = create_test_json();
         let result = handle_single_access(&json, "not_array", 0, vec!["name"]);
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
             Error::IndexOutOfBounds(_) => {
@@ -741,7 +786,7 @@ mod tests {
         // エラーケース: 空配列へのアクセス
         let json = create_test_json();
         let result = handle_single_access(&json, "empty_array", 0, vec!["name"]);
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
             Error::IndexOutOfBounds(index) => {

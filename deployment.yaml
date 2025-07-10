@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  namespace: production
+  labels:
+    app: web-app
+    version: v1.2.0
+    environment: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+        version: v1.2.0
+    spec:
+      containers:
+        - name: web-container
+          image: nginx:1.21.6
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          env:
+            - name: ENV
+              value: "production"
+            - name: LOG_LEVEL
+              value: "info"
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/nginx/conf.d
+        - name: sidecar-container
+          image: busybox:1.35
+          command: ["sleep", "3600"]
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+      volumes:
+        - name: config-volume
+          configMap:
+            name: nginx-config
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - key: "environment"
+          operator: "Equal"
+          value: "production"
+          effect: "NoSchedule"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app-service
+  namespace: production
+  labels:
+    app: web-app
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    app: web-app
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: production
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+        }
+    }

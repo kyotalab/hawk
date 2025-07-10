@@ -4,6 +4,16 @@ pub fn parse_query_segments(query: &str) -> Result<(&str, Vec<&str>), Error> {
     if query == "." {
         return Ok(("", vec![]));
     }
+
+    // ".[0]" のような場合の特別扱い
+    if query.starts_with(".[") {
+        let remaining = &query[1..]; // "[0]" or "[0].field"
+        let mut segments = remaining.split('.');
+        let first_segment = segments.next().unwrap(); // "[0]"
+        let rest: Vec<&str> = segments.collect();
+        return Ok(("", vec![vec![first_segment], rest].concat()));
+    }
+
     let mut segments = query.split('.').skip(1);
     let segment = segments.next().ok_or(Error::InvalidQuery("Missing field segment in query".into()))?;
     let fields: Vec<&str> = segments.collect();
@@ -136,7 +146,7 @@ mod tests {
     fn test_parse_query_segments_multiple_segments() {
         // 修正: 複数セグメントは正常に処理される
         let result = parse_query_segments(".users.name.extra");
-        assert!(result.is_ok()); 
+        assert!(result.is_ok());
         let (segment, fields) = result.unwrap();
         assert_eq!(segment, "users");
         assert_eq!(fields, vec!["name", "extra"]); // 3番目も含まれる
