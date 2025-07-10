@@ -50,7 +50,7 @@ pub fn setup() -> Result<(Value, String, OutputFormat), Error> {
 enum InputFormat {
     Json,
     Yaml,
-    // Csv, // 将来追加
+    Csv, // 将来追加
 }
 fn detect_input_format(content: &str) -> InputFormat {
     let trimmed = content.trim();
@@ -59,6 +59,11 @@ fn detect_input_format(content: &str) -> InputFormat {
    //  println!("=== Format Detection Debug ===");
    //  println!("Content length: {}", content.len());
    //  println!("First 200 chars: {}", trimmed.chars().take(200).collect::<String>());
+
+    // CSV判定を最初に行う（シンプルな形式から）
+    if is_likely_csv(trimmed) {
+        return InputFormat::Csv;
+    }
 
     // YAML判定を先に行う（より具体的な条件）
     if trimmed.contains("apiVersion:") ||
@@ -80,10 +85,8 @@ fn detect_input_format(content: &str) -> InputFormat {
 
     // 最後の手段: コロンがあればYAML、なければJSON
     if trimmed.contains(':') {
-        println!("Detected format: YAML (fallback)");
         InputFormat::Yaml
     } else {
-        println!("Detected format: JSON (default)");
         InputFormat::Json
     }
 }
@@ -100,6 +103,9 @@ fn parse_content(content: &str, format: InputFormat) -> Result<Value, Error> {
             } else {
                 serde_yaml::from_str(content).map_err(Error::Yaml)
             }
+        }
+        InputFormat::Csv => {
+            parse_csv_to_json(content)
         }
     }
 }
@@ -120,6 +126,87 @@ fn parse_multi_document_yaml(content: &str) -> Result<Value, Error> {
 
     // 複数ドキュメントを配列として返す
     Ok(Value::Array(parsed_docs))
+}
+
+fn is_likely_csv(content: &str) -> bool {
+    let lines: Vec<&str> = content.lines().take(5).collect();
+
+    if lines.is_empty() {
+        return false;
+    }
+
+    // 最初の行をヘッダーとして想定
+    let first_line = lines[0];
+    let comma_count = first_line.matches(',').count();
+
+    // カンマが1個以上あり、他の行も同じような構造
+    if comma_count > 0 {
+        // 他の行も同じようなカンマ数か確認
+        lines.iter().skip(1).all(|line| {
+            let line_comma_count = line.matches(',').count();
+            (line_comma_count as i32 - comma_count as i32).abs() <= 1
+        })
+    } else {
+        false
+    }
+}
+fn parse_csv_to_json(content: &str) -> Result<Value, Error> {
+    let mut reader = csv::Reader::from_reader(content.as_bytes());
+
+    // ヘッダーを取得
+    let headers: Vec<String> = reader.headers()
+        .map_err(|e| Error::Csv(e))?
+        .iter()
+        .map(|h| h.trim().to_string())
+        .collect();
+
+    let mut records = Vec::new();
+
+    for result in reader.records() {
+        let record = result.map_err(|e| Error::Csv(e))?;
+        let mut object = serde_json::Map::new();
+
+        for (i, field) in record.iter().enumerate() {
+            if let Some(header) = headers.get(i) {
+                let value = infer_value_type(field.trim());
+                object.insert(header.clone(), value);
+            }
+        }
+
+        records.push(Value::Object(object));
+    }
+
+    // 直接配列を返す（二重配列にしない）
+    Ok(Value::Array(records))
+}
+
+fn infer_value_type(field: &str) -> Value {
+    // 空文字チェック
+    if field.is_empty() {
+        return Value::Null;
+    }
+
+    // 真偽値判定
+    match field.to_lowercase().as_str() {
+        "true" => return Value::Bool(true),
+        "false" => return Value::Bool(false),
+        _ => {}
+    }
+
+    // 整数判定
+    if let Ok(int_val) = field.parse::<i64>() {
+        return Value::Number(serde_json::Number::from(int_val));
+    }
+
+    // 浮動小数点数判定
+    if let Ok(float_val) = field.parse::<f64>() {
+        if let Some(num) = serde_json::Number::from_f64(float_val) {
+            return Value::Number(num);
+        }
+    }
+
+    // デフォルトは文字列
+    Value::String(field.to_string())
 }
 
 pub fn debug_json_order(json: &Value) {

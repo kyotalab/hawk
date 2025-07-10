@@ -14,6 +14,9 @@ pub enum Error {
     #[error("YAML deserialization error: {0}")]
     Yaml(#[from] serde_yaml::Error), // serde_yaml::Error から自動変換
 
+    #[error("CSV parsing error: {0}")]
+    Csv(#[from] csv::Error),
+
     #[error("str parse int error: {0}")]
     StrToInt(#[from] std::num::ParseIntError), // std::num::ParseIntError からの自動変換
 

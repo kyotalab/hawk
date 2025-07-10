@@ -282,7 +282,13 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
     let (segment, fields) = parse_query_segments(query)?;
 
     if segment.is_empty() && fields.is_empty() {
-        return Ok(vec![json.clone()]);
+        // JSONが配列の場合は、その要素を展開して返す
+        if let Value::Array(arr) = json {
+            return Ok(arr.clone());
+        } else {
+            // オブジェクトの場合はそのまま
+            return Ok(vec![json.clone()]);
+        }
     }
 
     // ルート配列アクセス（.[0] のような場合）
