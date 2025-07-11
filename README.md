@@ -28,7 +28,7 @@ Modern data analysis tool for structured data (JSON, YAML, CSV)
 ### Installation
 ```bash
 # Install via Homebrew (macOS/Linux)
-brew install kyotalab/tools/hawk
+brew install kyotalab/tap/hawk
 
 # Verify installation
 hawk --version
@@ -58,6 +58,7 @@ hawk '.sales | group_by(.region) | avg(.amount)' sales.csv
 .array[]                  # Access all array elements
 .nested.field             # Deep field access
 .array[0].nested.field    # Complex nested access
+.array[].nested[]         # Multi-level array expansion
 ```
 
 ### Filtering
@@ -66,6 +67,13 @@ hawk '.sales | group_by(.region) | avg(.amount)' sales.csv
 . | select(.name == "Alice")    # String equality
 . | select(.active == true)     # Boolean comparison
 . | select(.status != "inactive") # Not equal
+. | select(.State.Name == "running") # Nested field filtering
+```
+
+### Field Selection
+```bash
+. | select_fields(name,age)     # Select multiple fields
+. | select_fields(name,department,salary) # Custom field subset
 ```
 
 ### Aggregation
@@ -90,6 +98,12 @@ hawk '.sales | group_by(.region) | avg(.amount)' sales.csv
 # Multi-step analysis
 .users[] | select(.age > 25) | group_by(.department) | avg(.salary)
 
+# Multi-level array processing
+.Reservations[].Instances[] | select(.State.Name == "running")
+
+# Field selection with filtering
+.users[] | select_fields(name,salary) | select(.salary > 80000)
+
 # Data exploration workflow
 .data | info                          # Understand structure
 .data[] | select(.status == "active") # Filter active records
@@ -104,7 +118,7 @@ hawk '.sales | group_by(.region) | avg(.amount)' sales.csv
 curl -s "https://api.github.com/users/kyotalab/repos" | hawk '.[] | select(.language == "Rust") | count'
 
 # Extract specific fields
-curl -s "https://api.github.com/users/kyotalab/repos" | hawk '.[].name' --format list
+curl -s "https://api.github.com/users/kyotalab/repos" | hawk '.[] | .name' --format list
 ```
 
 ### DevOps & Infrastructure
@@ -112,6 +126,10 @@ curl -s "https://api.github.com/users/kyotalab/repos" | hawk '.[].name' --format
 # Kubernetes resource analysis
 hawk '.items[] | select(.status.phase == "Running")' pods.json
 hawk '.spec.template.spec.containers[0].image' deployment.yaml
+
+# AWS EC2 analysis
+hawk '.Reservations[].Instances[] | select(.State.Name == "running")' describe-instances.json
+hawk '.Reservations[].Instances[] | group_by(.InstanceType) | count' ec2-data.json
 
 # Docker Compose services
 hawk '.services | info' docker-compose.yml
@@ -123,6 +141,9 @@ hawk '.services[] | select(.ports)' docker-compose.yml
 # Sales data analysis
 hawk '.sales | group_by(.region) | sum(.amount)' sales.csv
 hawk '.transactions[] | select(.amount > 1000) | avg(.amount)' transactions.json
+
+# Multi-field analysis
+hawk '.employees[] | select_fields(name,department,salary) | group_by(.department)' payroll.csv
 
 # Log analysis
 hawk '.logs[] | select(.level == "ERROR") | count' app-logs.json
@@ -161,9 +182,6 @@ users:
     age: 25
     department: Marketing
 ```
-
-> [!Note]
-> Standard YAML syntax is fully supported. CloudFormation-specific syntax (`!Ref`, `!Sub`, etc.) will be supported in a future release.
 
 ### CSV
 ```csv
@@ -212,6 +230,9 @@ hawk '.containers[] | select(.memory_usage > 512) | .name' docker-stats.json
 # Analyze Kubernetes deployments by namespace
 hawk '.items[] | group_by(.metadata.namespace) | count' deployments.json
 
+# AWS EC2 cost analysis
+hawk '.Reservations[].Instances[] | select_fields(InstanceType,State.Name) | group_by(.InstanceType)' ec2.json
+
 # Extract configuration errors from logs
 hawk '.logs[] | select(.level == "ERROR" && .source == "config")' app.json
 ```
@@ -224,10 +245,13 @@ hawk '. | info' unknown-data.json
 # 2. Filter relevant data
 hawk '.records[] | select(.timestamp >= "2024-01")' data.json
 
-# 3. Group and analyze
+# 3. Multi-level processing
+hawk '.data[].items[] | select_fields(id,status,metrics)' complex-data.json
+
+# 4. Group and analyze
 hawk '.records[] | group_by(.category) | avg(.score)' data.json
 
-# 4. Export results
+# 5. Export results
 hawk '.summary[]' data.json --format csv > results.csv
 ```
 
@@ -258,7 +282,6 @@ sudo cp target/release/hawk /usr/local/bin/
 Download pre-built binaries from [GitHub Releases](https://github.com/kyotalab/hawk/releases)
 - Linux (x86_64)
 - macOS (Intel & Apple Silicon)
-- Windows (x86_64)
 
 ## 📚 Documentation
 
@@ -277,7 +300,10 @@ hawk '.query' --format json  # Specify output format
 | Field access | `.field` | `.name` |
 | Array index | `.array[0]` | `.users[0]` |
 | Array iteration | `.array[]` | `.users[]` |
+| Multi-level arrays | `.array[].nested[]` | `.Reservations[].Instances[]` |
+| Field selection | `\| select_fields(field1,field2)` | `\| select_fields(name,age)` |
 | Filtering | `\| select(.field > value)` | `\| select(.age > 30)` |
+| Nested filtering | `\| select(.nested.field == value)` | `\| select(.State.Name == "running")` |
 | Grouping | `\| group_by(.field)` | `\| group_by(.department)` |
 | Counting | `\| count` | `.users \| count` |
 | Aggregation | `\| sum/avg/min/max(.field)` | `\| avg(.salary)` |
@@ -358,20 +384,6 @@ hawk '.spec.containers[] | select(.resources.limits.memory)' deployment.yaml
 
 ---
 
-## 🗺️ Roadmap
-
-### v0.2.0 (Planned)
-- CloudFormation YAML syntax support (`!Ref`, `!Sub`, `!GetAtt`, etc.)
-- Terraform HCL support
-- Additional aggregation functions (`median`, `stddev`)
-
-### v0.3.0 (Planned)
-- Regular expression support in filters
-- String manipulation functions
-- Performance optimizations for large files
-
----
-
 **Happy data exploring with hawk!** 🦅
 
-For questions, issues, or feature requests, please visit our [GitHub repository](https://github.com/yourusername/hawk).
+For questions, issues, or feature requests, please visit our [GitHub repository](https://github.com/kyotalab/hawk).
