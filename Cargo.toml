@@ -1,7 +1,16 @@
 [package]
 name = "hawk"
 version = "0.1.0"
-edition = "2024"
+edition = "2025"
+authors = ["Kyota <jagbvg.eptpeox@gmail.com>"]
+license = "MIT"
+description = "Modern data analysis tool for structured data (JSON, YAML, CSV)"
+readme = "README.md"
+homepage = "https://github.com/kyotalab/hawk"
+repository = "https://github.com/kyotalab/hawk"
+keywords = ["awk", "cli", "jq", "analysis"]
+categories = ["command-line-utilities"]
+
 
 [dependencies]
 anyhow = "1.0.98"
