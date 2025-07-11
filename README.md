@@ -104,10 +104,10 @@ hawk '.sales | group_by(.region) | avg(.amount)' sales.csv
 ### API Response Analysis
 ```bash
 # Analyze GitHub API response
-curl -s "https://api.github.com/users/octocat/repos" | hawk '.[] | select(.language == "JavaScript") | count'
+curl -s "https://api.github.com/users/kyotalab/repos" | hawk '.[] | select(.language == "Rust") | count'
 
 # Extract specific fields
-curl -s "https://api.github.com/users/octocat/repos" | hawk '.[] | .name' --format list
+curl -s "https://api.github.com/users/kyotalab/repos" | hawk '.[].name' --format list
 ```
 
 ### DevOps & Infrastructure
@@ -180,7 +180,6 @@ All formats support the same query syntax!
 ```bash
 hawk '.users[0].name' data.json    # → Alice (list)
 hawk '.users[]' data.json          # → Table format
-hawk '.config' data.json           # → JSON format
 ```
 
 ### Explicit Format Control
@@ -297,7 +296,6 @@ cargo test
 ### Running Tests
 ```bash
 cargo test                    # Run all tests
-cargo test --test integration # Run integration tests
 ```
 
 ## 📄 License

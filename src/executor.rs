@@ -79,31 +79,56 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
             return Ok(vec![json.clone()]);
         }
     }
-
     // ルート配列アクセス（.[0] のような場合）
-    // Root array access (such as [.0])
     if segment.is_empty() && !fields.is_empty() {
         let first_field = fields[0];
 
         // [0] のような配列インデックスかチェック
-        // Check for array indexes such as [0]
         if first_field.starts_with('[') && first_field.ends_with(']') {
             let index_str = &first_field[1..first_field.len() - 1];
-            let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
 
-            if let Value::Array(arr) = json {
-                let item = arr.get(index).ok_or(Error::IndexOutOfBounds(index))?;
+            // 空括弧 [] の場合は配列全体を処理
+            if index_str.is_empty() {
+                if let Value::Array(arr) = json {
+                    // 残りのフィールドがある場合は各要素に適用
+                    if fields.len() > 1 {
+                        let remaining_fields = fields[1..].to_vec();
+                        let mut results = Vec::new();
 
-                // 残りのフィールドがある場合
-                // If there are remaining fields
-                if fields.len() > 1 {
-                    let remaining_fields = fields[1..].to_vec();
-                    return handle_nested_field_access(item, remaining_fields);
+                        for item in arr {
+                            if let Ok(mut item_results) =
+                                handle_nested_field_access(item, remaining_fields.clone())
+                            {
+                                results.append(&mut item_results);
+                            }
+                        }
+                        return Ok(results);
+                    } else {
+                        // フィールドがない場合は配列全体を返す
+                        return Ok(arr.clone());
+                    }
                 } else {
-                    return Ok(vec![item.clone()]);
+                    return Err(Error::InvalidQuery(
+                        "Cannot iterate over non-array value".into(),
+                    ));
                 }
             } else {
-                return Err(Error::InvalidQuery("Cannot index non-array value".into()));
+                // 通常のインデックスアクセス
+                let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
+
+                if let Value::Array(arr) = json {
+                    let item = arr.get(index).ok_or(Error::IndexOutOfBounds(index))?;
+
+                    // 残りのフィールドがある場合
+                    if fields.len() > 1 {
+                        let remaining_fields = fields[1..].to_vec();
+                        return handle_nested_field_access(item, remaining_fields);
+                    } else {
+                        return Ok(vec![item.clone()]);
+                    }
+                } else {
+                    return Err(Error::InvalidQuery("Cannot index non-array value".into()));
+                }
             }
         }
     }
