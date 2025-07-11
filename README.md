@@ -165,6 +165,9 @@ users:
     department: Marketing
 ```
 
+> [!Note]
+> Standard YAML syntax is fully supported. CloudFormation-specific syntax (`!Ref`, `!Sub`, etc.) will be supported in a future release.
+
 ### CSV
 ```csv
 name,age,department
@@ -347,6 +350,20 @@ hawk '.sales | group_by(.region) | avg(.amount)' sales.csv
 hawk '.spec.containers[] | select(.resources.limits.memory)' deployment.yaml
 # vs jq: requires YAML→JSON conversion first
 ```
+
+---
+
+## 🗺️ Roadmap
+
+### v0.2.0 (Planned)
+- CloudFormation YAML syntax support (`!Ref`, `!Sub`, `!GetAtt`, etc.)
+- Terraform HCL support
+- Additional aggregation functions (`median`, `stddev`)
+
+### v0.3.0 (Planned)
+- Regular expression support in filters
+- String manipulation functions
+- Performance optimizations for large files
 
 ---
 
