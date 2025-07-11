@@ -1,26 +1,42 @@
 use crate::Error;
 
 pub fn parse_query_segments(query: &str) -> Result<(&str, Vec<&str>), Error> {
+    // println!("=== parse_query_segments Debug ===");
+    // println!("Input query: '{}'", query);
+
     if query == "." {
         return Ok(("", vec![]));
     }
 
+    // パイプライン操作がある場合は基本クエリ部分のみを処理
+    let base_query = if query.contains('|') {
+        query.split('|').next().unwrap().trim()
+    } else {
+        query
+    };
+
+    // println!("Base query: '{}'", base_query);
+
     // ".[0]" のような場合の特別扱い
-    if query.starts_with(".[") {
-        let remaining = &query[1..]; // "[0]" or "[0].field"
+    if base_query.starts_with(".[") {
+        let remaining = &base_query[1..];
         let mut segments = remaining.split('.');
-        let first_segment = segments.next().unwrap(); // "[0]"
+        let first_segment = segments.next().unwrap();
         let rest: Vec<&str> = segments.collect();
-        return Ok(("", vec![vec![first_segment], rest].concat()));
+        let result = Ok(("", vec![vec![first_segment], rest].concat()));
+        // println!("Root array access result: {:?}", result);
+        return result;
     }
 
-    let mut segments = query.split('.').skip(1);
+    let mut segments = base_query.split('.').skip(1);
     let segment = segments
         .next()
         .ok_or(Error::InvalidQuery("Missing field segment in query".into()))?;
     let fields: Vec<&str> = segments.collect();
 
-    Ok((segment, fields))
+    let result = Ok((segment, fields));
+    // println!("Normal parse result: {:?}", result);
+    result
 }
 
 pub fn parse_array_segment(segment: &str) -> Result<(usize, usize), Error> {
