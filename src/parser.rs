@@ -15,21 +15,41 @@ pub fn parse_query_segments(query: &str) -> Result<(&str, Vec<&str>), Error> {
     }
 
     let mut segments = query.split('.').skip(1);
-    let segment = segments.next().ok_or(Error::InvalidQuery("Missing field segment in query".into()))?;
+    let segment = segments
+        .next()
+        .ok_or(Error::InvalidQuery("Missing field segment in query".into()))?;
     let fields: Vec<&str> = segments.collect();
 
     Ok((segment, fields))
 }
 
 pub fn parse_array_segment(segment: &str) -> Result<(usize, usize), Error> {
-    let idx = segment.find('[').ok_or(Error::InvalidQuery("Missing '[' in segment".into()))?;
-    let ridx = segment.find(']').ok_or(Error::InvalidQuery("Missing ']' in segment".into()))?;
+    let idx = segment
+        .find('[')
+        .ok_or(Error::InvalidQuery("Missing '[' in segment".into()))?;
+    let ridx = segment
+        .find(']')
+        .ok_or(Error::InvalidQuery("Missing ']' in segment".into()))?;
 
     if idx >= ridx {
         return Err(Error::InvalidQuery("Invalid bracket order".into()));
     }
 
     Ok((idx, ridx))
+}
+
+pub fn parse_field_list(segment: &str) -> Vec<String> {
+    // .users[name,age,department] の解析
+    if let Some(start) = segment.find('[') {
+        if let Some(end) = segment.find(']') {
+            let fields_str = &segment[start + 1..end];
+            return fields_str
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect();
+        }
+    }
+    vec![]
 }
 
 #[cfg(test)]
@@ -168,7 +188,7 @@ mod tests {
         let result = parse_array_segment("users[0]");
         assert!(result.is_ok());
         let (idx, ridx) = result.unwrap();
-        assert_eq!(idx, 5);  // '[' の位置
+        assert_eq!(idx, 5); // '[' の位置
         assert_eq!(ridx, 7); // ']' の位置
     }
 
@@ -178,8 +198,8 @@ mod tests {
         let result = parse_array_segment("items[123]");
         assert!(result.is_ok());
         let (idx, ridx) = result.unwrap();
-        assert_eq!(idx, 5);   // '[' の位置
-        assert_eq!(ridx, 9);  // ']' の位置
+        assert_eq!(idx, 5); // '[' の位置
+        assert_eq!(ridx, 9); // ']' の位置
     }
 
     #[test]
@@ -188,7 +208,7 @@ mod tests {
         let result = parse_array_segment("a[5]");
         assert!(result.is_ok());
         let (idx, ridx) = result.unwrap();
-        assert_eq!(idx, 1);  // '[' の位置
+        assert_eq!(idx, 1); // '[' の位置
         assert_eq!(ridx, 3); // ']' の位置
     }
 
@@ -237,7 +257,7 @@ mod tests {
         let result = parse_array_segment("users[]");
         assert!(result.is_ok()); // パース自体は成功する
         let (idx, ridx) = result.unwrap();
-        assert_eq!(idx, 5);  // '[' の位置
+        assert_eq!(idx, 5); // '[' の位置
         assert_eq!(ridx, 6); // ']' の位置
     }
 
