@@ -9,10 +9,6 @@ pub struct Args {
     pub query: String,
     pub path: Option<PathBuf>,
 
-    /// Expand array fields into separate rows
-    #[arg(long, action = clap::ArgAction::SetTrue)]
-    pub expand_arrays: Option<bool>,
-
     /// Format output (table, json, csv)
     #[arg(long, default_value = "auto")]
     pub format: String,

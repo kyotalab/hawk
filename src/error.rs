@@ -6,19 +6,19 @@ pub enum Error {
     InvalidFormat(String),
 
     #[error("File not found: {0}")]
-    FileNotFound(#[from] std::io::Error), // std::io::Error から自動変換
+    FileNotFound(#[from] std::io::Error),
 
     #[error("JSON deserialization error: {0}")]
-    Json(#[from] serde_json::Error), // serde_json::Error から自動変換
+    Json(#[from] serde_json::Error),
 
     #[error("YAML deserialization error: {0}")]
-    Yaml(#[from] serde_yaml::Error), // serde_yaml::Error から自動変換
+    Yaml(#[from] serde_yaml::Error),
 
     #[error("CSV parsing error: {0}")]
     Csv(#[from] csv::Error),
 
     #[error("str parse int error: {0}")]
-    StrToInt(#[from] std::num::ParseIntError), // std::num::ParseIntError からの自動変換
+    StrToInt(#[from] std::num::ParseIntError),
 
     #[error("Invalid query format: {0}")]
     InvalidQuery(String),

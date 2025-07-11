@@ -8,9 +8,11 @@ pub fn apply_simple_filter(data: Vec<Value>, filter: &str) -> Result<Vec<Value>,
         let condition = &filter[7..filter.len() - 1];
 
         // 条件をパース
+        // Parse conditions
         let (field_path, operator, value) = parse_condition(condition)?;
 
         // フィルタリングを実行
+        // Execute filtering
         let filtered: Vec<Value> = data
             .into_iter()
             .filter(|item| evaluate_condition(item, &field_path, &operator, &value))
@@ -28,9 +30,11 @@ pub fn apply_simple_filter(data: Vec<Value>, filter: &str) -> Result<Vec<Value>,
 pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec<Value>, Error> {
     if operation.starts_with("select(") && operation.ends_with(")") {
         // フィルタリング操作
+        // Filtering operations
         apply_simple_filter(data, operation)
     } else if operation == "count" {
         // カウント操作
+        // Count operation
         if is_grouped_data(&data) {
             apply_aggregation_to_groups(data, "count", "")
         } else {
@@ -40,10 +44,12 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         }
     } else if operation == "info" {
         // info操作
+        // info operation
         print_data_info(&data);
-        Ok(vec![]) // 空のVecを返す
+        Ok(vec![]) // Return empty vector
     } else if operation.starts_with("sum(") && operation.ends_with(")") {
         // sum(.field) の処理
+        // Processing of sum(.field)
         let field = &operation[4..operation.len() - 1];
         let field_name = field.trim_start_matches('.');
 
@@ -66,6 +72,7 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         }
     } else if operation.starts_with("avg(") && operation.ends_with(")") {
         // avg(.field) の処理
+        // Processing of avg(.field)
         let field = &operation[4..operation.len() - 1];
         let field_name = field.trim_start_matches('.');
 
@@ -89,6 +96,7 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         }
     } else if operation.starts_with("min(") && operation.ends_with(")") {
         // min(.field) の処理
+        // Processing of min(.field)
         let field = &operation[4..operation.len() - 1];
         let field_name = field.trim_start_matches('.');
 
@@ -110,6 +118,7 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         }
     } else if operation.starts_with("max(") && operation.ends_with(")") {
         // max(.field) の処理
+        // Processing of max(.field)
         let field = &operation[4..operation.len() - 1];
         let field_name = field.trim_start_matches('.');
 
@@ -131,6 +140,7 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         }
     } else if operation.starts_with("group_by(") && operation.ends_with(")") {
         // group_by(.department) の処理
+        // Processing of group_by(.field)
         let field = &operation[9..operation.len() - 1];
         let field_name = field.trim_start_matches('.');
 
@@ -150,6 +160,7 @@ fn group_data_by_field(data: Vec<Value>, field_name: &str) -> Result<Vec<Value>,
     let mut groups: HashMap<String, Vec<Value>> = HashMap::new();
 
     // データをフィールド値でグルーピング
+    // Group data by field values
     for item in data {
         if let Some(field_value) = item.get(field_name) {
             let key = value_to_string(field_value);
@@ -158,6 +169,7 @@ fn group_data_by_field(data: Vec<Value>, field_name: &str) -> Result<Vec<Value>,
     }
 
     // グループを配列として返す
+    // Return the group as an array
     let result: Vec<Value> = groups
         .into_iter()
         .map(|(group_name, group_items)| {
@@ -171,12 +183,13 @@ fn group_data_by_field(data: Vec<Value>, field_name: &str) -> Result<Vec<Value>,
     Ok(result)
 }
 
-// 条件をパースする関数
 fn parse_condition(condition: &str) -> Result<(String, String, String), Error> {
     // ".age > 30" のような条件をパース
+    // Parse conditions such as “.age > 30”
     let condition = condition.trim();
 
     // 演算子を検出
+    // Detect operators
     if let Some(pos) = condition.find(" > ") {
         let field = condition[..pos].trim().to_string();
         let value = condition[pos + 3..].trim().to_string();
@@ -204,9 +217,9 @@ fn parse_condition(condition: &str) -> Result<(String, String, String), Error> {
     Err(Error::InvalidQuery("Invalid condition format".into()))
 }
 
-// 条件を評価する関数
 fn evaluate_condition(item: &Value, field_path: &str, operator: &str, value: &str) -> bool {
     // フィールドパスから値を取得 (.age -> age)
+    // Get the value from the field path (.age -> age)
     let field_name = if field_path.starts_with('.') {
         &field_path[1..]
     } else {
@@ -215,7 +228,7 @@ fn evaluate_condition(item: &Value, field_path: &str, operator: &str, value: &st
 
     let field_value = match item.get(field_name) {
         Some(val) => val,
-        None => return false, // フィールドが存在しない場合はfalse
+        None => return false, // false if the field does not exist
     };
 
     match operator {
@@ -227,7 +240,6 @@ fn evaluate_condition(item: &Value, field_path: &str, operator: &str, value: &st
     }
 }
 
-// 比較関数
 fn compare_greater(field_value: &Value, target: &str) -> bool {
     match field_value {
         Value::Number(n) => {
@@ -258,6 +270,7 @@ fn compare_equal(field_value: &Value, target: &str) -> bool {
     match field_value {
         Value::String(s) => {
             // 文字列比較（引用符を除去）
+            // String comparison (remove quotation marks)
             let target_clean = target.trim_matches('"');
             s == target_clean
         }
@@ -300,6 +313,7 @@ fn apply_aggregation_to_groups(
             let items = group_obj.get("items").and_then(|v| v.as_array()).unwrap();
 
             // 各グループのitemsに対して集約を実行
+            // Perform aggregation on items in each group
             let aggregated_value = match operation {
                 "avg" => calculate_avg(items, field_name)?,
                 "sum" => calculate_sum(items, field_name)?,
@@ -310,6 +324,7 @@ fn apply_aggregation_to_groups(
             };
 
             // 結果オブジェクトを作成
+            // Create result object
             let mut result_obj = serde_json::Map::new();
             result_obj.insert("group".to_string(), group_name.clone());
             result_obj.insert(operation.to_string(), aggregated_value);

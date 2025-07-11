@@ -1,14 +1,14 @@
-use indexmap::IndexSet;
 use serde_json::Value;
 
 use crate::{
-    Error, OutputFormat, apply_pipeline_operation, parse_array_segment, parse_query_segments,
-    value_to_string,
+    Error, OutputFormat, apply_pipeline_operation, format_output, parse_array_segment,
+    parse_query_segments, value_to_string,
 };
 
 pub fn execute_query(json: &Value, query: &str, format: OutputFormat) -> Result<(), Error> {
     if query.contains('|') {
         // 複数パイプライン処理
+        // Multiple pipeline processing
         let parts: Vec<&str> = query.split('|').map(|s| s.trim()).collect();
 
         if parts.len() < 2 {
@@ -16,15 +16,18 @@ pub fn execute_query(json: &Value, query: &str, format: OutputFormat) -> Result<
         }
 
         // 最初のクエリでデータを取得
+        // Retrieve data with the first query
         let initial_query = parts[0];
         let mut current_data = execute_basic_query_as_json(json, initial_query)?;
 
         // 残りのパイプライン操作を順次実行
+        // Execute the remaining pipeline operations sequentially.
         for operation in &parts[1..] {
             current_data = apply_pipeline_operation(current_data, &operation)?;
         }
 
         // 最終結果の出力
+        // Output of final results
         format_output(&current_data, format)?;
     } else {
         let result_data = execute_basic_query_as_json(json, query)?;
@@ -34,234 +37,11 @@ pub fn execute_query(json: &Value, query: &str, format: OutputFormat) -> Result<
     Ok(())
 }
 
-fn format_output(data: &[Value], format: OutputFormat) -> Result<(), Error> {
-    if data.is_empty() {
-        return Ok(());
-    }
-
-    match format {
-        OutputFormat::Json => {
-            // 明示的にJSON出力
-            print_as_json(data)?;
-        }
-        OutputFormat::Table => {
-            // 明示的にテーブル出力（可能な場合）
-            if is_object_array(data) {
-                print_as_table(data);
-            } else {
-                let flattened = flatten_nested_arrays(data);
-                if is_object_array(&flattened) {
-                    print_as_table(&flattened);
-                } else {
-                    return Err(Error::InvalidQuery(
-                        "Cannot display as table: data is not object array".into(),
-                    ));
-                }
-            }
-        }
-        OutputFormat::List => {
-            // 明示的にリスト出力
-            print_as_list(data);
-        }
-        OutputFormat::Auto => {
-            // 既存のスマート判定ロジック
-            match analyze_data_structure(data) {
-                DataType::SimpleList => print_as_list(data),
-                DataType::ObjectArray => print_as_table(data),
-                DataType::NestedArray => {
-                    let flattened = flatten_nested_arrays(data);
-                    if is_object_array(&flattened) {
-                        print_as_table(&flattened);
-                    } else if is_simple_values(&flattened) {
-                        print_as_list(&flattened);
-                    } else {
-                        print_as_json(data)?;
-                    }
-                }
-                DataType::Mixed => print_as_json(data)?,
-            }
-        }
-    }
-
-    Ok(())
-}
-
-#[derive(Debug)]
-enum DataType {
-    SimpleList,  // [string, number, bool]
-    ObjectArray, // [{"name": "Alice"}, {"name": "Bob"}]
-    NestedArray, // [[{"name": "Project1"}], [{"name": "Project2"}]]
-    Mixed,       // その他の複雑な構造
-}
-
-fn analyze_data_structure(data: &[Value]) -> DataType {
-    if is_simple_values(data) {
-        return DataType::SimpleList;
-    }
-
-    if is_object_array(data) {
-        return DataType::ObjectArray;
-    }
-
-    // ネストした配列かチェック
-    if data.len() == 1 && data[0].is_array() {
-        return DataType::NestedArray;
-    }
-
-    DataType::Mixed
-}
-
-fn flatten_nested_arrays(data: &[Value]) -> Vec<Value> {
-    let mut flattened = Vec::new();
-
-    for item in data {
-        match item {
-            Value::Array(arr) => {
-                // 配列の中身を展開
-                flattened.extend(arr.iter().cloned());
-            }
-            _ => {
-                flattened.push(item.clone());
-            }
-        }
-    }
-
-    flattened
-}
-
-fn is_simple_values(data: &[Value]) -> bool {
-    data.iter()
-        .all(|v| matches!(v, Value::String(_) | Value::Number(_) | Value::Bool(_)))
-}
-
-fn is_object_array(data: &[Value]) -> bool {
-    data.iter().all(|v| v.is_object())
-}
-
-fn print_as_list(data: &[Value]) {
-    data.iter().for_each(|item| {
-        println!("{}", value_to_string(item));
-    });
-}
-
-fn print_as_table(data: &[Value]) {
-    if data.is_empty() {
-        return;
-    }
-
-    // 1. 全オブジェクトからフラット化されたフィールド名を収集
-    let mut all_fields = IndexSet::new();
-    for item in data {
-        collect_flattened_fields_ordered(item, "", &mut all_fields);
-    }
-
-    let fields: Vec<String> = all_fields.into_iter().collect();
-
-    // 2. 各列の最大幅を計算
-    let mut max_widths = vec![0; fields.len()];
-
-    // ヘッダーの幅
-    for (i, field) in fields.iter().enumerate() {
-        max_widths[i] = field.len();
-    }
-
-    // データの幅
-    for item in data {
-        for (i, field) in fields.iter().enumerate() {
-            let value_str = get_flattened_value(item, field);
-            max_widths[i] = max_widths[i].max(value_str.len());
-        }
-    }
-
-    // 3. ヘッダー出力
-    for (i, field) in fields.iter().enumerate() {
-        print!("{:<width$}", field, width = max_widths[i]);
-        if i < fields.len() - 1 {
-            print!("  ");
-        }
-    }
-    println!();
-
-    // 4. データ行出力
-    for item in data {
-        for (i, field) in fields.iter().enumerate() {
-            let value_str = get_flattened_value(item, field);
-            print!("{:<width$}", value_str, width = max_widths[i]);
-            if i < fields.len() - 1 {
-                print!("  ");
-            }
-        }
-        println!();
-    }
-}
-
-fn collect_flattened_fields_ordered(value: &Value, prefix: &str, fields: &mut IndexSet<String>) {
-    match value {
-        Value::Object(obj) => {
-            for (key, val) in obj {
-                // serde_json::Mapは順序を保持
-                let field_name = if prefix.is_empty() {
-                    key.clone()
-                } else {
-                    format!("{}.{}", prefix, key)
-                };
-
-                match val {
-                    Value::Object(_) => {
-                        collect_flattened_fields_ordered(val, &field_name, fields);
-                    }
-                    _ => {
-                        fields.insert(field_name);
-                    }
-                }
-            }
-        }
-        _ => {
-            if !prefix.is_empty() {
-                fields.insert(prefix.to_string());
-            }
-        }
-    }
-}
-
-// フラット化されたフィールドの値を取得
-fn get_flattened_value(item: &Value, field_path: &str) -> String {
-    let parts: Vec<&str> = field_path.split('.').collect();
-    let mut current = item;
-
-    for part in parts {
-        match current.get(part) {
-            Some(val) => current = val,
-            None => return "".to_string(),
-        }
-    }
-
-    match current {
-        Value::Array(arr) => {
-            // 配列は簡略表示
-            format!("[{} items]", arr.len())
-        }
-        _ => value_to_string(current),
-    }
-}
-
-fn print_as_json(data: &[Value]) -> Result<(), Error> {
-    let json = serde_json::to_string_pretty(data).map_err(|e| Error::Json(e))?;
-
-    println!("{}", json);
-    Ok(())
-}
-
 pub fn execute_basic_query(json: &Value, query: &str) -> Result<Vec<String>, Error> {
     let (segment, fields) = parse_query_segments(query)?;
-    // debug
-    // println!("{}", segment);
-    // println!("{}", param);
 
     if segment.contains('[') && segment.contains(']') {
         let (idx, ridx) = parse_array_segment(segment)?; // debug
-        // println!("{}", idx);
-        // println!("{}", ridx);
 
         let key = segment
             .get(..idx)
@@ -290,19 +70,23 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
 
     if segment.is_empty() && fields.is_empty() {
         // JSONが配列の場合は、その要素を展開して返す
+        // If JSON is an array, expand its elements and return them.
         if let Value::Array(arr) = json {
             return Ok(arr.clone());
         } else {
             // オブジェクトの場合はそのまま
+            // In the case of objects, leave as is.
             return Ok(vec![json.clone()]);
         }
     }
 
     // ルート配列アクセス（.[0] のような場合）
+    // Root array access (such as [.0])
     if segment.is_empty() && !fields.is_empty() {
         let first_field = fields[0];
 
         // [0] のような配列インデックスかチェック
+        // Check for array indexes such as [0]
         if first_field.starts_with('[') && first_field.ends_with(']') {
             let index_str = &first_field[1..first_field.len() - 1];
             let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
@@ -311,6 +95,7 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
                 let item = arr.get(index).ok_or(Error::IndexOutOfBounds(index))?;
 
                 // 残りのフィールドがある場合
+                // If there are remaining fields
                 if fields.len() > 1 {
                     let remaining_fields = fields[1..].to_vec();
                     return handle_nested_field_access(item, remaining_fields);
@@ -334,13 +119,14 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
 
         if index_str.is_empty() {
             // 配列全体を返す
+            // Return the entire array
             let result = handle_array_access_as_json(json, key, fields)?;
             Ok(result)
         } else {
             // 単一要素を返す
             let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
             let result = handle_single_access_as_json(json, key, index, fields)?;
-            Ok(vec![result]) // 単一要素も配列として返す
+            Ok(vec![result]) // Return single elements as arrays
         }
     } else {
         let result = handle_array_access_as_json(json, segment, fields)?;
@@ -388,10 +174,10 @@ pub fn handle_single_access_as_json(
         .ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
     let mut current = values.get(index).ok_or(Error::IndexOutOfBounds(index))?;
 
-    // fieldsを順次辿る（handle_single_accessと同じロジック）
     for field in fields {
         if field.contains('[') && field.contains(']') {
             // 配列アクセスの場合
+            // In the case of array access
             let (idx, ridx) = parse_array_segment(field)?;
             let field_key = field
                 .get(..idx)
@@ -402,6 +188,7 @@ pub fn handle_single_access_as_json(
             let field_index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
 
             // field_key でアクセスしてから、field_index でアクセス
+            // Access with field_key, then access with field_index
             let array = current.get(field_key).ok_or(Error::InvalidQuery(format!(
                 "Field '{}' not found",
                 field_key
@@ -411,6 +198,7 @@ pub fn handle_single_access_as_json(
                 .ok_or(Error::IndexOutOfBounds(field_index))?;
         } else {
             // 通常のフィールドアクセス
+            // Normal field access
             current = current
                 .get(field)
                 .ok_or(Error::InvalidQuery(format!("Field '{}' not found", field)))?;
@@ -418,6 +206,7 @@ pub fn handle_single_access_as_json(
     }
 
     // value_to_stringではなく、Valueのまま返す
+    // Return Value as is, rather than value_to_string.
     Ok(current.clone())
 }
 
@@ -483,16 +272,19 @@ pub fn handle_single_access(
     index: usize,
     fields: Vec<&str>,
 ) -> Result<Vec<String>, Error> {
-    // 1. 最初の配列要素を取得
+    // 最初の配列要素を取得
+    // Get the first array element
     let values = json
         .get(key)
         .ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
     let mut current = values.get(index).ok_or(Error::IndexOutOfBounds(index))?;
 
-    // 2. fieldsを順次辿る
+    // fieldsを順次辿る
+    // Traverse fields sequentially
     for field in fields {
         if field.contains('[') && field.contains(']') {
             // 配列アクセスの場合
+            // In the case of array access
             let (idx, ridx) = parse_array_segment(field)?;
             let field_key = field
                 .get(..idx)
@@ -503,6 +295,7 @@ pub fn handle_single_access(
             let field_index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
 
             // field_key でアクセスしてから、field_index でアクセス
+            // Access with field_key, then access with field_index
             let array = current.get(field_key).ok_or(Error::InvalidQuery(format!(
                 "Field '{}' not found",
                 field_key
@@ -511,7 +304,7 @@ pub fn handle_single_access(
                 .get(field_index)
                 .ok_or(Error::IndexOutOfBounds(field_index))?;
         } else {
-            // 通常のフィールドアクセス
+            // Normal field access
             current = current
                 .get(field)
                 .ok_or(Error::InvalidQuery(format!("Field '{}' not found", field)))?;
@@ -537,11 +330,13 @@ pub fn handle_array_access(
         .iter()
         .filter_map(|array_item| {
             // 各配列要素に対してフィールドパスを辿る
+            // Trace the field path for each array element
             let mut current = array_item;
 
             for field in &fields {
                 if field.contains('[') && field.contains(']') {
                     // 配列アクセスの場合
+                    // In the case of array access
                     if let Ok((idx, ridx)) = parse_array_segment(field) {
                         if let Some(field_key) = field.get(..idx) {
                             if let Some(index_str) = field.get(idx + 1..ridx) {
@@ -557,13 +352,16 @@ pub fn handle_array_access(
                         }
                     }
                     // エラーの場合はこの要素をスキップ
+                    // Skip this element in case of error
                     return None;
                 } else {
                     // 通常のフィールドアクセス
+                    // Normal field access
                     if let Some(next) = current.get(field) {
                         current = next;
                     } else {
                         // フィールドが存在しない場合はこの要素をスキップ
+                        // Skip this element if the field does not exist.
                         return None;
                     }
                 }
@@ -574,81 +372,6 @@ pub fn handle_array_access(
         .collect();
 
     Ok(res)
-}
-
-pub fn print_data_info(data: &[Value]) {
-    println!("=== Data Information ===");
-    println!("Total records: {}", data.len());
-
-    if data.is_empty() {
-        return;
-    }
-
-    // データ型の分析
-    let first_item = &data[0];
-    match first_item {
-        Value::Object(obj) => {
-            println!("Type: Object Array");
-            println!("Fields: {}", obj.len());
-            println!();
-
-            // フィールド一覧と型情報
-            println!("Field Details:");
-            for (key, value) in obj {
-                let field_type = get_value_type_info(value);
-                let sample_value = get_sample_value(value);
-                println!("  {:<15} {:<10} (e.g., {})", key, field_type, sample_value);
-            }
-
-            // 配列フィールドの詳細
-            println!();
-            println!("Array Fields:");
-            for (key, value) in obj {
-                if let Value::Array(arr) = value {
-                    println!("  {:<15} [{} items]", key, arr.len());
-                    if let Some(first_elem) = arr.get(0) {
-                        if let Value::Object(elem_obj) = first_elem {
-                            print!("    └─ ");
-                            let sub_fields: Vec<&String> = elem_obj.keys().collect();
-                            let sub_fields: Vec<&str> =
-                                sub_fields.into_iter().map(|f| f.as_str()).collect();
-                            println!("{}", sub_fields.join(", "));
-                        }
-                    }
-                }
-            }
-        }
-        Value::Array(_) => {
-            println!("Type: Nested Array");
-            // ネストした配列の詳細
-        }
-        _ => {
-            println!("Type: Simple Values");
-            // プリミティブ値の統計
-        }
-    }
-}
-
-fn get_value_type_info(value: &Value) -> &'static str {
-    match value {
-        Value::String(_) => "String",
-        Value::Number(_) => "Number",
-        Value::Bool(_) => "Boolean",
-        Value::Array(_) => "Array",
-        Value::Object(_) => "Object",
-        Value::Null => "Null",
-    }
-}
-
-fn get_sample_value(value: &Value) -> String {
-    match value {
-        Value::String(s) => format!("\"{}\"", s.chars().take(20).collect::<String>()),
-        Value::Number(n) => n.to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Array(arr) => format!("[{} items]", arr.len()),
-        Value::Object(obj) => format!("{{{}...}}", obj.keys().next().unwrap_or(&"".to_string())),
-        Value::Null => "null".to_string(),
-    }
 }
 
 #[cfg(test)]
@@ -876,13 +599,6 @@ mod tests {
         }
     }
 
-    //    #[test]
-    //    fn test_execute_query_end_to_end() {
-    //        let json = create_test_json();
-    //        let result = execute_query(&json, ".users[0].name");
-    //        assert_eq!(result.unwrap(), vec!["Alice"]);
-    //    }
-
     fn create_nested_test_json() -> Value {
         json!({
             "users": [
@@ -984,36 +700,4 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), vec!["Item1", "Item3"]); // 中間要素はスキップ
     }
-
-    //    #[test]
-    //    fn test_execute_query_simple() {
-    //        let json = create_nested_test_json();
-    //        let result = execute_query(&json, ".users[0].name");
-    //        assert!(result.is_ok());
-    //        assert_eq!(result.unwrap(), vec!["Alice"]);
-    //    }
-    //
-    //    #[test]
-    //    fn test_execute_query_array_access() {
-    //        let json = create_nested_test_json();
-    //        let result = execute_query(&json, ".users.name");
-    //        assert!(result.is_ok());
-    //        assert_eq!(result.unwrap(), vec!["Alice", "Bob"]);
-    //    }
-    //
-    //    #[test]
-    //    fn test_execute_query_deep_nesting() {
-    //        let json = create_nested_test_json();
-    //        let result = execute_query(&json, ".users[0].projects[0].name");
-    //        assert!(result.is_ok());
-    //        assert_eq!(result.unwrap(), vec!["Project A"]);
-    //    }
-    //
-    //    #[test]
-    //    fn test_execute_query_nested_object_array() {
-    //        let json = create_nested_test_json();
-    //        let result = execute_query(&json, ".users.projects[0].name");
-    //        assert!(result.is_ok());
-    //        assert_eq!(result.unwrap(), vec!["Project A", "Project C"]);
-    //    }
 }
