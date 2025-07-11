@@ -1,7 +1,7 @@
 use anyhow::Result;
-use hawk::{execute_query, setup, Error};
+use hawk::{Error, execute_query, setup};
 
-fn main() -> Result<(), Error>{
+fn main() -> Result<(), Error> {
     // Load CLI arguments and file
     let (json, query, format) = setup()?;
 
@@ -9,8 +9,3 @@ fn main() -> Result<(), Error>{
 
     Ok(())
 }
-
-
-
-
-

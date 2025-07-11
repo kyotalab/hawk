@@ -18,11 +18,11 @@ pub use utils::*;
 
 pub fn setup() -> Result<(Value, String, OutputFormat), Error> {
     let args = Args::parse();
-   //  let reader: Box<dyn BufRead> = if let Some(path) = args.path {
-   //      Box::new(BufReader::new(File::open(path)?))
-   //  } else {
-   //      Box::new(BufReader::new(io::stdin()))
-   //  };
+    //  let reader: Box<dyn BufRead> = if let Some(path) = args.path {
+    //      Box::new(BufReader::new(File::open(path)?))
+    //  } else {
+    //      Box::new(BufReader::new(io::stdin()))
+    //  };
 
     let content = if let Some(path) = args.path {
         std::fs::read_to_string(path)?
@@ -34,12 +34,13 @@ pub fn setup() -> Result<(Value, String, OutputFormat), Error> {
 
     let input_format = detect_input_format(&content);
 
-    let data= parse_content(&content, input_format)?;
+    let data = parse_content(&content, input_format)?;
     let query = args.query;
 
-    let format = args.format.parse::<OutputFormat>()
+    let format = args
+        .format
+        .parse::<OutputFormat>()
         .map_err(|e| Error::InvalidFormat(e.to_string()))?;
-
 
     // debug
     // debug_json_order(&json);
@@ -56,9 +57,9 @@ fn detect_input_format(content: &str) -> InputFormat {
     let trimmed = content.trim();
 
     // デバッグ情報を出力
-   //  println!("=== Format Detection Debug ===");
-   //  println!("Content length: {}", content.len());
-   //  println!("First 200 chars: {}", trimmed.chars().take(200).collect::<String>());
+    //  println!("=== Format Detection Debug ===");
+    //  println!("Content length: {}", content.len());
+    //  println!("First 200 chars: {}", trimmed.chars().take(200).collect::<String>());
 
     // CSV判定を最初に行う（シンプルな形式から）
     if is_likely_csv(trimmed) {
@@ -66,17 +67,20 @@ fn detect_input_format(content: &str) -> InputFormat {
     }
 
     // YAML判定を先に行う（より具体的な条件）
-    if trimmed.contains("apiVersion:") ||
-        trimmed.contains("kind:") ||
-        trimmed.contains("metadata:") ||
-        trimmed.contains("spec:") ||
-        (trimmed.contains(":\n") || trimmed.contains(": ")) {  // YAML特有のkey: value形式
+    if trimmed.contains("apiVersion:")
+        || trimmed.contains("kind:")
+        || trimmed.contains("metadata:")
+        || trimmed.contains("spec:")
+        || (trimmed.contains(":\n") || trimmed.contains(": "))
+    {
+        // YAML特有のkey: value形式
         return InputFormat::Yaml;
     }
 
     // JSON判定（厳密にチェック）
-    if (trimmed.starts_with('{') && trimmed.ends_with('}')) ||
-        (trimmed.starts_with('[') && trimmed.ends_with(']')) {
+    if (trimmed.starts_with('{') && trimmed.ends_with('}'))
+        || (trimmed.starts_with('[') && trimmed.ends_with(']'))
+    {
         // さらに、全体がJSONとして有効かチェック
         if serde_json::from_str::<serde_json::Value>(trimmed).is_ok() {
             return InputFormat::Json;
@@ -93,9 +97,7 @@ fn detect_input_format(content: &str) -> InputFormat {
 
 fn parse_content(content: &str, format: InputFormat) -> Result<Value, Error> {
     match format {
-        InputFormat::Json => {
-            serde_json::from_str(content).map_err(Error::Json)
-        }
+        InputFormat::Json => serde_json::from_str(content).map_err(Error::Json),
         InputFormat::Yaml => {
             // 複数ドキュメントに対応
             if content.contains("---") {
@@ -104,9 +106,7 @@ fn parse_content(content: &str, format: InputFormat) -> Result<Value, Error> {
                 serde_yaml::from_str(content).map_err(Error::Yaml)
             }
         }
-        InputFormat::Csv => {
-            parse_csv_to_json(content)
-        }
+        InputFormat::Csv => parse_csv_to_json(content),
     }
 }
 
@@ -154,7 +154,8 @@ fn parse_csv_to_json(content: &str) -> Result<Value, Error> {
     let mut reader = csv::Reader::from_reader(content.as_bytes());
 
     // ヘッダーを取得
-    let headers: Vec<String> = reader.headers()
+    let headers: Vec<String> = reader
+        .headers()
         .map_err(|e| Error::Csv(e))?
         .iter()
         .map(|h| h.trim().to_string())

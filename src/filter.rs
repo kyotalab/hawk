@@ -1,24 +1,27 @@
 use serde_json::Value;
 
-use crate::{print_data_info, value_to_string, Error};
-
+use crate::{Error, print_data_info, value_to_string};
 
 pub fn apply_simple_filter(data: Vec<Value>, filter: &str) -> Result<Vec<Value>, Error> {
     if filter.starts_with("select(") && filter.ends_with(")") {
         // "select(.age > 30)" から ".age > 30" を抽出
-        let condition = &filter[7..filter.len()-1];
+        let condition = &filter[7..filter.len() - 1];
 
         // 条件をパース
         let (field_path, operator, value) = parse_condition(condition)?;
 
         // フィルタリングを実行
-        let filtered: Vec<Value> = data.into_iter()
+        let filtered: Vec<Value> = data
+            .into_iter()
             .filter(|item| evaluate_condition(item, &field_path, &operator, &value))
             .collect();
 
         Ok(filtered)
     } else {
-        Err(Error::InvalidQuery(format!("Unsupported filter: {}", filter)))
+        Err(Error::InvalidQuery(format!(
+            "Unsupported filter: {}",
+            filter
+        )))
     }
 }
 
@@ -41,13 +44,14 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         Ok(vec![]) // 空のVecを返す
     } else if operation.starts_with("sum(") && operation.ends_with(")") {
         // sum(.field) の処理
-        let field = &operation[4..operation.len()-1];
+        let field = &operation[4..operation.len() - 1];
         let field_name = field.trim_start_matches('.');
 
         if is_grouped_data(&data) {
             apply_aggregation_to_groups(data, "sum", field_name)
         } else {
-            let sum: f64 = data.iter()
+            let sum: f64 = data
+                .iter()
                 .filter_map(|item| item.get(field_name))
                 .filter_map(|val| val.as_f64())
                 .sum();
@@ -62,13 +66,14 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         }
     } else if operation.starts_with("avg(") && operation.ends_with(")") {
         // avg(.field) の処理
-        let field = &operation[4..operation.len()-1];
+        let field = &operation[4..operation.len() - 1];
         let field_name = field.trim_start_matches('.');
 
         if is_grouped_data(&data) {
             apply_aggregation_to_groups(data, "avg", field_name)
         } else {
-            let values: Vec<f64> = data.iter()
+            let values: Vec<f64> = data
+                .iter()
                 .filter_map(|item| item.get(field_name))
                 .filter_map(|val| val.as_f64())
                 .collect();
@@ -84,13 +89,14 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         }
     } else if operation.starts_with("min(") && operation.ends_with(")") {
         // min(.field) の処理
-        let field = &operation[4..operation.len()-1];
+        let field = &operation[4..operation.len() - 1];
         let field_name = field.trim_start_matches('.');
 
         if is_grouped_data(&data) {
             apply_aggregation_to_groups(data, "min", field_name)
         } else {
-            let min_val = data.iter()
+            let min_val = data
+                .iter()
                 .filter_map(|item| item.get(field_name))
                 .filter_map(|val| val.as_f64())
                 .fold(f64::INFINITY, f64::min);
@@ -104,13 +110,14 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         }
     } else if operation.starts_with("max(") && operation.ends_with(")") {
         // max(.field) の処理
-        let field = &operation[4..operation.len()-1];
+        let field = &operation[4..operation.len() - 1];
         let field_name = field.trim_start_matches('.');
 
         if is_grouped_data(&data) {
             apply_aggregation_to_groups(data, "max", field_name)
         } else {
-            let max_val = data.iter()
+            let max_val = data
+                .iter()
                 .filter_map(|item| item.get(field_name))
                 .filter_map(|val| val.as_f64())
                 .fold(f64::NEG_INFINITY, f64::max);
@@ -124,16 +131,18 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         }
     } else if operation.starts_with("group_by(") && operation.ends_with(")") {
         // group_by(.department) の処理
-        let field = &operation[9..operation.len()-1];
+        let field = &operation[9..operation.len() - 1];
         let field_name = field.trim_start_matches('.');
 
         let grouped = group_data_by_field(data, field_name)?;
         Ok(grouped)
     } else {
-        Err(Error::InvalidQuery(format!("Unsupported operation: {}", operation)))
+        Err(Error::InvalidQuery(format!(
+            "Unsupported operation: {}",
+            operation
+        )))
     }
 }
-
 
 fn group_data_by_field(data: Vec<Value>, field_name: &str) -> Result<Vec<Value>, Error> {
     use std::collections::HashMap;
@@ -149,7 +158,8 @@ fn group_data_by_field(data: Vec<Value>, field_name: &str) -> Result<Vec<Value>,
     }
 
     // グループを配列として返す
-    let result: Vec<Value> = groups.into_iter()
+    let result: Vec<Value> = groups
+        .into_iter()
         .map(|(group_name, group_items)| {
             let mut group_obj = serde_json::Map::new();
             group_obj.insert("group".to_string(), Value::String(group_name));
@@ -258,13 +268,11 @@ fn compare_equal(field_value: &Value, target: &str) -> bool {
                 false
             }
         }
-        Value::Bool(b) => {
-            match target {
-                "true" => *b,
-                "false" => !*b,
-                _ => false,
-            }
-        }
+        Value::Bool(b) => match target {
+            "true" => *b,
+            "false" => !*b,
+            _ => false,
+        },
         _ => false,
     }
 }
@@ -279,14 +287,18 @@ fn is_grouped_data(data: &[Value]) -> bool {
     })
 }
 
-fn apply_aggregation_to_groups(data: Vec<Value>, operation: &str, field_name: &str) -> Result<Vec<Value>, Error> {
+fn apply_aggregation_to_groups(
+    data: Vec<Value>,
+    operation: &str,
+    field_name: &str,
+) -> Result<Vec<Value>, Error> {
     let mut results = Vec::new();
-    
+
     for group_data in data {
         if let Value::Object(group_obj) = group_data {
             let group_name = group_obj.get("group").unwrap();
             let items = group_obj.get("items").and_then(|v| v.as_array()).unwrap();
-            
+
             // 各グループのitemsに対して集約を実行
             let aggregated_value = match operation {
                 "avg" => calculate_avg(items, field_name)?,
@@ -296,7 +308,7 @@ fn apply_aggregation_to_groups(data: Vec<Value>, operation: &str, field_name: &s
                 "max" => calculate_max(items, field_name)?,
                 _ => Value::Null,
             };
-            
+
             // 結果オブジェクトを作成
             let mut result_obj = serde_json::Map::new();
             result_obj.insert("group".to_string(), group_name.clone());
@@ -304,62 +316,74 @@ fn apply_aggregation_to_groups(data: Vec<Value>, operation: &str, field_name: &s
             results.push(Value::Object(result_obj));
         }
     }
-    
+
     Ok(results)
 }
 
 fn calculate_avg(items: &[Value], field_name: &str) -> Result<Value, Error> {
-    let values: Vec<f64> = items.iter()
+    let values: Vec<f64> = items
+        .iter()
         .filter_map(|item| item.get(field_name))
         .filter_map(|val| val.as_f64())
         .collect();
-    
+
     if values.is_empty() {
         Ok(Value::Null)
     } else {
         let avg = values.iter().sum::<f64>() / values.len() as f64;
         let rounded_avg = (avg * 10.0).round() / 10.0;
-        Ok(Value::Number(serde_json::Number::from_f64(rounded_avg).unwrap()))
+        Ok(Value::Number(
+            serde_json::Number::from_f64(rounded_avg).unwrap(),
+        ))
     }
 }
 
 fn calculate_sum(items: &[Value], field_name: &str) -> Result<Value, Error> {
-    let sum: f64 = items.iter()
+    let sum: f64 = items
+        .iter()
         .filter_map(|item| item.get(field_name))
         .filter_map(|val| val.as_f64())
         .sum();
-    
+
     let rounded_sum = if sum.fract() == 0.0 {
         sum
     } else {
         (sum * 10.0).round() / 10.0
     };
-    
-    Ok(Value::Number(serde_json::Number::from_f64(rounded_sum).unwrap()))
+
+    Ok(Value::Number(
+        serde_json::Number::from_f64(rounded_sum).unwrap(),
+    ))
 }
 
 fn calculate_min(items: &[Value], field_name: &str) -> Result<Value, Error> {
-    let min_val = items.iter()
+    let min_val = items
+        .iter()
         .filter_map(|item| item.get(field_name))
         .filter_map(|val| val.as_f64())
         .fold(f64::INFINITY, f64::min);
-    
+
     if min_val == f64::INFINITY {
         Ok(Value::Null)
     } else {
-        Ok(Value::Number(serde_json::Number::from_f64(min_val).unwrap()))
+        Ok(Value::Number(
+            serde_json::Number::from_f64(min_val).unwrap(),
+        ))
     }
 }
 
 fn calculate_max(items: &[Value], field_name: &str) -> Result<Value, Error> {
-    let max_val = items.iter()
+    let max_val = items
+        .iter()
         .filter_map(|item| item.get(field_name))
         .filter_map(|val| val.as_f64())
         .fold(f64::NEG_INFINITY, f64::max);
-    
+
     if max_val == f64::NEG_INFINITY {
         Ok(Value::Null)
     } else {
-        Ok(Value::Number(serde_json::Number::from_f64(max_val).unwrap()))
+        Ok(Value::Number(
+            serde_json::Number::from_f64(max_val).unwrap(),
+        ))
     }
 }

@@ -1,7 +1,10 @@
 use indexmap::IndexSet;
 use serde_json::Value;
 
-use crate::{apply_pipeline_operation, parse_array_segment, parse_query_segments, value_to_string, Error, OutputFormat};
+use crate::{
+    Error, OutputFormat, apply_pipeline_operation, parse_array_segment, parse_query_segments,
+    value_to_string,
+};
 
 pub fn execute_query(json: &Value, query: &str, format: OutputFormat) -> Result<(), Error> {
     if query.contains('|') {
@@ -50,7 +53,9 @@ fn format_output(data: &[Value], format: OutputFormat) -> Result<(), Error> {
                 if is_object_array(&flattened) {
                     print_as_table(&flattened);
                 } else {
-                    return Err(Error::InvalidQuery("Cannot display as table: data is not object array".into()));
+                    return Err(Error::InvalidQuery(
+                        "Cannot display as table: data is not object array".into(),
+                    ));
                 }
             }
         }
@@ -81,13 +86,12 @@ fn format_output(data: &[Value], format: OutputFormat) -> Result<(), Error> {
     Ok(())
 }
 
-
 #[derive(Debug)]
 enum DataType {
-    SimpleList,    // [string, number, bool]
-    ObjectArray,   // [{"name": "Alice"}, {"name": "Bob"}]
-    NestedArray,   // [[{"name": "Project1"}], [{"name": "Project2"}]]
-    Mixed,         // その他の複雑な構造
+    SimpleList,  // [string, number, bool]
+    ObjectArray, // [{"name": "Alice"}, {"name": "Bob"}]
+    NestedArray, // [[{"name": "Project1"}], [{"name": "Project2"}]]
+    Mixed,       // その他の複雑な構造
 }
 
 fn analyze_data_structure(data: &[Value]) -> DataType {
@@ -126,7 +130,8 @@ fn flatten_nested_arrays(data: &[Value]) -> Vec<Value> {
 }
 
 fn is_simple_values(data: &[Value]) -> bool {
-    data.iter().all(|v| matches!(v, Value::String(_) | Value::Number(_) | Value::Bool(_)))
+    data.iter()
+        .all(|v| matches!(v, Value::String(_) | Value::Number(_) | Value::Bool(_)))
 }
 
 fn is_object_array(data: &[Value]) -> bool {
@@ -137,7 +142,6 @@ fn print_as_list(data: &[Value]) {
     data.iter().for_each(|item| {
         println!("{}", value_to_string(item));
     });
-
 }
 
 fn print_as_table(data: &[Value]) {
@@ -194,7 +198,8 @@ fn print_as_table(data: &[Value]) {
 fn collect_flattened_fields_ordered(value: &Value, prefix: &str, fields: &mut IndexSet<String>) {
     match value {
         Value::Object(obj) => {
-            for (key, val) in obj {  // serde_json::Mapは順序を保持
+            for (key, val) in obj {
+                // serde_json::Mapは順序を保持
                 let field_name = if prefix.is_empty() {
                     key.clone()
                 } else {
@@ -236,7 +241,7 @@ fn get_flattened_value(item: &Value, field_path: &str) -> String {
             // 配列は簡略表示
             format!("[{} items]", arr.len())
         }
-        _ => value_to_string(current)
+        _ => value_to_string(current),
     }
 }
 
@@ -247,7 +252,6 @@ fn print_as_json(data: &[Value]) -> Result<(), Error> {
     Ok(())
 }
 
-
 pub fn execute_basic_query(json: &Value, query: &str) -> Result<Vec<String>, Error> {
     let (segment, fields) = parse_query_segments(query)?;
     // debug
@@ -255,18 +259,21 @@ pub fn execute_basic_query(json: &Value, query: &str) -> Result<Vec<String>, Err
     // println!("{}", param);
 
     if segment.contains('[') && segment.contains(']') {
-        let (idx, ridx) = parse_array_segment(segment)?;        // debug
+        let (idx, ridx) = parse_array_segment(segment)?; // debug
         // println!("{}", idx);
         // println!("{}", ridx);
 
-        let key = segment.get(..idx).ok_or(Error::InvalidQuery("Invalid segment format".into()))?;
-        let index_str = segment.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
+        let key = segment
+            .get(..idx)
+            .ok_or(Error::InvalidQuery("Invalid segment format".into()))?;
+        let index_str = segment
+            .get(idx + 1..ridx)
+            .ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
 
         if index_str.is_empty() {
             let result = handle_array_access(json, key, fields)?;
             Ok(result)
         } else {
-
             let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
             let result = handle_single_access(json, key, index, fields)?;
             Ok(result)
@@ -297,7 +304,7 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
 
         // [0] のような配列インデックスかチェック
         if first_field.starts_with('[') && first_field.ends_with(']') {
-            let index_str = &first_field[1..first_field.len()-1];
+            let index_str = &first_field[1..first_field.len() - 1];
             let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
 
             if let Value::Array(arr) = json {
@@ -318,8 +325,12 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
 
     if segment.contains('[') && segment.contains(']') {
         let (idx, ridx) = parse_array_segment(segment)?;
-        let key = segment.get(..idx).ok_or(Error::InvalidQuery("Invalid segment format".into()))?;
-        let index_str = segment.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
+        let key = segment
+            .get(..idx)
+            .ok_or(Error::InvalidQuery("Invalid segment format".into()))?;
+        let index_str = segment
+            .get(idx + 1..ridx)
+            .ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
 
         if index_str.is_empty() {
             // 配列全体を返す
@@ -343,22 +354,38 @@ fn handle_nested_field_access(value: &Value, fields: Vec<&str>) -> Result<Vec<Va
     for field in fields {
         if field.contains('[') && field.contains(']') {
             let (idx, ridx) = parse_array_segment(field)?;
-            let field_key = field.get(..idx).ok_or(Error::InvalidQuery("Invalid field".into()))?;
-            let index_str = field.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
+            let field_key = field
+                .get(..idx)
+                .ok_or(Error::InvalidQuery("Invalid field".into()))?;
+            let index_str = field
+                .get(idx + 1..ridx)
+                .ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
             let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
 
-            let array = current.get(field_key).ok_or(Error::InvalidQuery(format!("Field '{}' not found", field_key)))?;
+            let array = current.get(field_key).ok_or(Error::InvalidQuery(format!(
+                "Field '{}' not found",
+                field_key
+            )))?;
             current = array.get(index).ok_or(Error::IndexOutOfBounds(index))?;
         } else {
-            current = current.get(field).ok_or(Error::InvalidQuery(format!("Field '{}' not found", field)))?;
+            current = current
+                .get(field)
+                .ok_or(Error::InvalidQuery(format!("Field '{}' not found", field)))?;
         }
     }
 
     Ok(vec![current.clone()])
 }
 
-pub fn handle_single_access_as_json(json: &Value, key: &str, index: usize, fields: Vec<&str>) -> Result<Value, Error> {
-    let values = json.get(key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
+pub fn handle_single_access_as_json(
+    json: &Value,
+    key: &str,
+    index: usize,
+    fields: Vec<&str>,
+) -> Result<Value, Error> {
+    let values = json
+        .get(key)
+        .ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
     let mut current = values.get(index).ok_or(Error::IndexOutOfBounds(index))?;
 
     // fieldsを順次辿る（handle_single_accessと同じロジック）
@@ -366,16 +393,27 @@ pub fn handle_single_access_as_json(json: &Value, key: &str, index: usize, field
         if field.contains('[') && field.contains(']') {
             // 配列アクセスの場合
             let (idx, ridx) = parse_array_segment(field)?;
-            let field_key = field.get(..idx).ok_or(Error::InvalidQuery("Invalid field".into()))?;
-            let index_str = field.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
+            let field_key = field
+                .get(..idx)
+                .ok_or(Error::InvalidQuery("Invalid field".into()))?;
+            let index_str = field
+                .get(idx + 1..ridx)
+                .ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
             let field_index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
 
             // field_key でアクセスしてから、field_index でアクセス
-            let array = current.get(field_key).ok_or(Error::InvalidQuery(format!("Field '{}' not found", field_key)))?;
-            current = array.get(field_index).ok_or(Error::IndexOutOfBounds(field_index))?;
+            let array = current.get(field_key).ok_or(Error::InvalidQuery(format!(
+                "Field '{}' not found",
+                field_key
+            )))?;
+            current = array
+                .get(field_index)
+                .ok_or(Error::IndexOutOfBounds(field_index))?;
         } else {
             // 通常のフィールドアクセス
-            current = current.get(field).ok_or(Error::InvalidQuery(format!("Field '{}' not found", field)))?;
+            current = current
+                .get(field)
+                .ok_or(Error::InvalidQuery(format!("Field '{}' not found", field)))?;
         }
     }
 
@@ -383,11 +421,20 @@ pub fn handle_single_access_as_json(json: &Value, key: &str, index: usize, field
     Ok(current.clone())
 }
 
-pub fn handle_array_access_as_json(json: &Value, key: &str, fields: Vec<&str>) -> Result<Vec<Value>, Error> {
-    let values = json.get(key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
-    let values_arr = values.as_array().ok_or(Error::InvalidQuery("Expected array".into()))?;
+pub fn handle_array_access_as_json(
+    json: &Value,
+    key: &str,
+    fields: Vec<&str>,
+) -> Result<Vec<Value>, Error> {
+    let values = json
+        .get(key)
+        .ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
+    let values_arr = values
+        .as_array()
+        .ok_or(Error::InvalidQuery("Expected array".into()))?;
 
-    let res: Vec<Value> = values_arr.iter()
+    let res: Vec<Value> = values_arr
+        .iter()
         .filter_map(|array_item| {
             // 各配列要素に対してフィールドパスを辿る（handle_array_accessと同じロジック）
             let mut current = array_item;
@@ -430,9 +477,16 @@ pub fn handle_array_access_as_json(json: &Value, key: &str, fields: Vec<&str>) -
     Ok(res)
 }
 
-pub fn handle_single_access(json: &Value, key: &str, index: usize, fields: Vec<&str>) -> Result<Vec<String>, Error> {
+pub fn handle_single_access(
+    json: &Value,
+    key: &str,
+    index: usize,
+    fields: Vec<&str>,
+) -> Result<Vec<String>, Error> {
     // 1. 最初の配列要素を取得
-    let values = json.get(key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
+    let values = json
+        .get(key)
+        .ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
     let mut current = values.get(index).ok_or(Error::IndexOutOfBounds(index))?;
 
     // 2. fieldsを順次辿る
@@ -440,27 +494,47 @@ pub fn handle_single_access(json: &Value, key: &str, index: usize, fields: Vec<&
         if field.contains('[') && field.contains(']') {
             // 配列アクセスの場合
             let (idx, ridx) = parse_array_segment(field)?;
-            let field_key = field.get(..idx).ok_or(Error::InvalidQuery("Invalid field".into()))?;
-            let index_str = field.get(idx + 1..ridx).ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
+            let field_key = field
+                .get(..idx)
+                .ok_or(Error::InvalidQuery("Invalid field".into()))?;
+            let index_str = field
+                .get(idx + 1..ridx)
+                .ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
             let field_index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
 
             // field_key でアクセスしてから、field_index でアクセス
-            let array = current.get(field_key).ok_or(Error::InvalidQuery(format!("Field '{}' not found", field_key)))?;
-            current = array.get(field_index).ok_or(Error::IndexOutOfBounds(field_index))?;
+            let array = current.get(field_key).ok_or(Error::InvalidQuery(format!(
+                "Field '{}' not found",
+                field_key
+            )))?;
+            current = array
+                .get(field_index)
+                .ok_or(Error::IndexOutOfBounds(field_index))?;
         } else {
             // 通常のフィールドアクセス
-            current = current.get(field).ok_or(Error::InvalidQuery(format!("Field '{}' not found", field)))?;
+            current = current
+                .get(field)
+                .ok_or(Error::InvalidQuery(format!("Field '{}' not found", field)))?;
         }
     }
 
     Ok(vec![value_to_string(current)])
 }
 
-pub fn handle_array_access(json: &Value, key: &str, fields: Vec<&str>) -> Result<Vec<String>, Error> {
-    let values = json.get(key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
-    let values_arr = values.as_array().ok_or(Error::InvalidQuery("Expected array".into()))?;
+pub fn handle_array_access(
+    json: &Value,
+    key: &str,
+    fields: Vec<&str>,
+) -> Result<Vec<String>, Error> {
+    let values = json
+        .get(key)
+        .ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
+    let values_arr = values
+        .as_array()
+        .ok_or(Error::InvalidQuery("Expected array".into()))?;
 
-    let res: Vec<String> = values_arr.iter()
+    let res: Vec<String> = values_arr
+        .iter()
         .filter_map(|array_item| {
             // 各配列要素に対してフィールドパスを辿る
             let mut current = array_item;
@@ -502,7 +576,6 @@ pub fn handle_array_access(json: &Value, key: &str, fields: Vec<&str>) -> Result
     Ok(res)
 }
 
-
 pub fn print_data_info(data: &[Value]) {
     println!("=== Data Information ===");
     println!("Total records: {}", data.len());
@@ -537,7 +610,8 @@ pub fn print_data_info(data: &[Value]) {
                         if let Value::Object(elem_obj) = first_elem {
                             print!("    └─ ");
                             let sub_fields: Vec<&String> = elem_obj.keys().collect();
-                            let sub_fields: Vec<&str> = sub_fields.into_iter().map(|f| f.as_str()).collect();
+                            let sub_fields: Vec<&str> =
+                                sub_fields.into_iter().map(|f| f.as_str()).collect();
                             println!("{}", sub_fields.join(", "));
                         }
                     }
@@ -580,7 +654,7 @@ fn get_sample_value(value: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     fn create_test_json() -> Value {
         json!({
@@ -802,12 +876,12 @@ mod tests {
         }
     }
 
-//    #[test]
-//    fn test_execute_query_end_to_end() {
-//        let json = create_test_json();
-//        let result = execute_query(&json, ".users[0].name");
-//        assert_eq!(result.unwrap(), vec!["Alice"]);
-//    }
+    //    #[test]
+    //    fn test_execute_query_end_to_end() {
+    //        let json = create_test_json();
+    //        let result = execute_query(&json, ".users[0].name");
+    //        assert_eq!(result.unwrap(), vec!["Alice"]);
+    //    }
 
     fn create_nested_test_json() -> Value {
         json!({
@@ -911,35 +985,35 @@ mod tests {
         assert_eq!(result.unwrap(), vec!["Item1", "Item3"]); // 中間要素はスキップ
     }
 
-//    #[test]
-//    fn test_execute_query_simple() {
-//        let json = create_nested_test_json();
-//        let result = execute_query(&json, ".users[0].name");
-//        assert!(result.is_ok());
-//        assert_eq!(result.unwrap(), vec!["Alice"]);
-//    }
-//
-//    #[test]
-//    fn test_execute_query_array_access() {
-//        let json = create_nested_test_json();
-//        let result = execute_query(&json, ".users.name");
-//        assert!(result.is_ok());
-//        assert_eq!(result.unwrap(), vec!["Alice", "Bob"]);
-//    }
-//
-//    #[test]
-//    fn test_execute_query_deep_nesting() {
-//        let json = create_nested_test_json();
-//        let result = execute_query(&json, ".users[0].projects[0].name");
-//        assert!(result.is_ok());
-//        assert_eq!(result.unwrap(), vec!["Project A"]);
-//    }
-//
-//    #[test]
-//    fn test_execute_query_nested_object_array() {
-//        let json = create_nested_test_json();
-//        let result = execute_query(&json, ".users.projects[0].name");
-//        assert!(result.is_ok());
-//        assert_eq!(result.unwrap(), vec!["Project A", "Project C"]);
-//    }
+    //    #[test]
+    //    fn test_execute_query_simple() {
+    //        let json = create_nested_test_json();
+    //        let result = execute_query(&json, ".users[0].name");
+    //        assert!(result.is_ok());
+    //        assert_eq!(result.unwrap(), vec!["Alice"]);
+    //    }
+    //
+    //    #[test]
+    //    fn test_execute_query_array_access() {
+    //        let json = create_nested_test_json();
+    //        let result = execute_query(&json, ".users.name");
+    //        assert!(result.is_ok());
+    //        assert_eq!(result.unwrap(), vec!["Alice", "Bob"]);
+    //    }
+    //
+    //    #[test]
+    //    fn test_execute_query_deep_nesting() {
+    //        let json = create_nested_test_json();
+    //        let result = execute_query(&json, ".users[0].projects[0].name");
+    //        assert!(result.is_ok());
+    //        assert_eq!(result.unwrap(), vec!["Project A"]);
+    //    }
+    //
+    //    #[test]
+    //    fn test_execute_query_nested_object_array() {
+    //        let json = create_nested_test_json();
+    //        let result = execute_query(&json, ".users.projects[0].name");
+    //        assert!(result.is_ok());
+    //        assert_eq!(result.unwrap(), vec!["Project A", "Project C"]);
+    //    }
 }
