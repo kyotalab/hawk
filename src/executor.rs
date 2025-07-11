@@ -69,11 +69,9 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
     let (segment, fields) = parse_query_segments(query)?;
 
     if segment.is_empty() && fields.is_empty() {
-        // JSONが配列の場合は、その要素を展開して返す
         if let Value::Array(arr) = json {
             return Ok(arr.clone());
         } else {
-            // オブジェクトの場合はそのまま
             return Ok(vec![json.clone()]);
         }
     }
@@ -82,14 +80,12 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
     if segment.is_empty() && !fields.is_empty() {
         let first_field = fields[0];
 
-        // [0] のような配列インデックスかチェック
         if first_field.starts_with('[') && first_field.ends_with(']') {
             let bracket_content = &first_field[1..first_field.len() - 1];
 
             // 空括弧 [] の場合は配列全体を処理
             if bracket_content.is_empty() {
                 if let Value::Array(arr) = json {
-                    // 残りのフィールドがある場合は各要素に適用
                     if fields.len() > 1 {
                         let remaining_fields = fields[1..].to_vec();
                         let mut results = Vec::new();
@@ -103,7 +99,6 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
                         }
                         return Ok(results);
                     } else {
-                        // フィールドがない場合は配列全体を返す
                         return Ok(arr.clone());
                     }
                 } else {
@@ -111,71 +106,23 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
                         "Cannot iterate over non-array value".into(),
                     ));
                 }
-            } else if bracket_content.contains(',') {
-                // 複数フィールド選択の処理
-                let field_list: Vec<String> = bracket_content
-                    .split(',')
-                    .map(|s| s.trim().to_string())
-                    .collect();
+            } else {
+                // **簡化: 数値インデックスのみ**
+                let index = bracket_content
+                    .parse::<usize>()
+                    .map_err(|e| Error::StrToInt(e))?;
 
                 if let Value::Array(arr) = json {
-                    let mut results = Vec::new();
+                    let item = arr.get(index).ok_or(Error::IndexOutOfBounds(index))?;
 
-                    for item in arr {
-                        let mut selected_obj = serde_json::Map::new();
-
-                        // 指定されたフィールドのみを抽出
-                        for field_name in &field_list {
-                            if let Some(value) = item.get(field_name) {
-                                selected_obj.insert(field_name.clone(), value.clone());
-                            }
-                        }
-
-                        results.push(Value::Object(selected_obj));
-                    }
-
-                    // 残りのフィールドがある場合は各結果に適用
                     if fields.len() > 1 {
                         let remaining_fields = fields[1..].to_vec();
-                        let mut final_results = Vec::new();
-
-                        for result in results {
-                            if let Ok(mut item_results) =
-                                handle_nested_field_access(&result, remaining_fields.clone())
-                            {
-                                final_results.append(&mut item_results);
-                            }
-                        }
-                        return Ok(final_results);
+                        return handle_nested_field_access(item, remaining_fields);
                     } else {
-                        return Ok(results);
+                        return Ok(vec![item.clone()]);
                     }
                 } else {
-                    return Err(Error::InvalidQuery(
-                        "Cannot apply multi-field selection to non-array value".into(),
-                    ));
-                }
-            } else {
-                // 数値インデックスアクセス
-                if let Ok(index) = bracket_content.parse::<usize>() {
-                    if let Value::Array(arr) = json {
-                        let item = arr.get(index).ok_or(Error::IndexOutOfBounds(index))?;
-
-                        // 残りのフィールドがある場合
-                        if fields.len() > 1 {
-                            let remaining_fields = fields[1..].to_vec();
-                            return handle_nested_field_access(item, remaining_fields);
-                        } else {
-                            return Ok(vec![item.clone()]);
-                        }
-                    } else {
-                        return Err(Error::InvalidQuery("Cannot index non-array value".into()));
-                    }
-                } else {
-                    // 数値でもカンマ区切りでもない場合はエラー
-                    return Err(Error::InvalidQuery(
-                        format!("Invalid bracket content: '{}'", bracket_content).into(),
-                    ));
+                    return Err(Error::InvalidQuery("Cannot index non-array value".into()));
                 }
             }
         }
@@ -195,82 +142,18 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
             // 配列全体を返す: .users[]
             let result = handle_array_access_as_json(json, key, fields)?;
             Ok(result)
-        } else if bracket_content.contains(',') {
-            // **修正: 複数フィールド選択 .users[name,age]**
-            let field_list: Vec<String> = bracket_content
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
-
-            // handle_multi_field_access関数を呼び出し
-            let result = handle_multi_field_access(json, key, field_list, fields)?;
-            Ok(result)
         } else {
-            // 数値インデックスアクセス: .users[0]
-            if let Ok(index) = bracket_content.parse::<usize>() {
-                let result = handle_single_access_as_json(json, key, index, fields)?;
-                Ok(vec![result])
-            } else {
-                return Err(Error::InvalidQuery(
-                    format!("Invalid bracket content: '{}'", bracket_content).into(),
-                ));
-            }
+            // **簡化: 数値インデックスのみ**
+            let index = bracket_content
+                .parse::<usize>()
+                .map_err(|e| Error::StrToInt(e))?;
+            let result = handle_single_access_as_json(json, key, index, fields)?;
+            Ok(vec![result])
         }
     } else {
         // 通常のフィールドアクセス
         let result = handle_array_access_as_json(json, segment, fields)?;
         Ok(result)
-    }
-}
-
-// 新しいヘルパー関数を追加
-fn handle_multi_field_access(
-    json: &Value,
-    key: &str,
-    field_list: Vec<String>,
-    remaining_fields: Vec<&str>,
-) -> Result<Vec<Value>, Error> {
-    if let Some(value) = json.get(key) {
-        if let Value::Array(arr) = value {
-            let mut results = Vec::new();
-
-            for item in arr {
-                let mut selected_obj = serde_json::Map::new();
-
-                // 指定されたフィールドのみを抽出
-                for field_name in &field_list {
-                    if let Some(field_value) = item.get(field_name) {
-                        selected_obj.insert(field_name.clone(), field_value.clone());
-                    }
-                }
-
-                results.push(Value::Object(selected_obj));
-            }
-
-            // 残りのフィールドがある場合は各結果に適用
-            if !remaining_fields.is_empty() {
-                let mut final_results = Vec::new();
-
-                for result in results {
-                    if let Ok(mut item_results) =
-                        handle_nested_field_access(&result, remaining_fields.to_vec())
-                    {
-                        final_results.append(&mut item_results);
-                    }
-                }
-                Ok(final_results)
-            } else {
-                Ok(results)
-            }
-        } else {
-            Err(Error::InvalidQuery(
-                "Cannot apply multi-field selection to non-array value".into(),
-            ))
-        }
-    } else {
-        Err(Error::InvalidQuery(
-            format!("Field '{}' not found", key).into(),
-        ))
     }
 }
 

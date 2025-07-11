@@ -38,20 +38,6 @@ pub fn parse_array_segment(segment: &str) -> Result<(usize, usize), Error> {
     Ok((idx, ridx))
 }
 
-pub fn parse_field_list(segment: &str) -> Vec<String> {
-    // .users[name,age,department] の解析
-    if let Some(start) = segment.find('[') {
-        if let Some(end) = segment.find(']') {
-            let fields_str = &segment[start + 1..end];
-            return fields_str
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
-        }
-    }
-    vec![]
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -42,6 +42,15 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
             let count_value = Value::Number(serde_json::Number::from(count));
             Ok(vec![count_value])
         }
+    } else if operation.starts_with("select_fields(") && operation.ends_with(")") {
+        // **新規追加: 複数フィールド選択**
+        let fields_str = &operation[14..operation.len() - 1]; // "name,age,department"
+        let field_list: Vec<String> = fields_str
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect();
+
+        apply_field_selection(data, field_list)
     } else if operation == "info" {
         // info操作
         // info operation
@@ -152,6 +161,32 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
             operation
         )))
     }
+}
+
+fn apply_field_selection(data: Vec<Value>, field_list: Vec<String>) -> Result<Vec<Value>, Error> {
+    let mut results = Vec::new();
+
+    for item in data {
+        if let Value::Object(obj) = item {
+            let mut selected_obj = serde_json::Map::new();
+
+            // 指定されたフィールドのみを抽出
+            for field_name in &field_list {
+                if let Some(value) = obj.get(field_name) {
+                    selected_obj.insert(field_name.clone(), value.clone());
+                }
+            }
+
+            results.push(Value::Object(selected_obj));
+        } else {
+            // オブジェクト以外は無視するか、エラーにする
+            return Err(Error::InvalidQuery(
+                "select_fields can only be applied to objects".into(),
+            ));
+        }
+    }
+
+    Ok(results)
 }
 
 fn group_data_by_field(data: Vec<Value>, field_name: &str) -> Result<Vec<Value>, Error> {
