@@ -26,15 +26,12 @@ Modern data analysis tool for structured data (JSON, YAML, CSV)
 ## 🚀 Quick Start
 
 ### Installation
-
 ```bash
-# Clone and build
-git clone https://github.com/kyotalab/hawk.git
-cd hawk
-cargo build --release
+# Install via Homebrew (macOS/Linux)
+brew install kyotalab/tools/hawk
 
-# Add to PATH
-cp target/release/hawk /usr/local/bin/
+# Verify installation
+hawk --version
 ```
 
 ### Basic Usage
@@ -183,6 +180,7 @@ All formats support the same query syntax!
 ```bash
 hawk '.users[0].name' data.json    # → Alice (list)
 hawk '.users[]' data.json          # → Table format
+hawk '.config' data.json           # → JSON format
 ```
 
 ### Explicit Format Control
@@ -235,25 +233,32 @@ hawk '.summary[]' data.json --format csv > results.csv
 
 ## 🔧 Installation & Setup
 
-### Prerequisites
-- Rust 1.70 or later
-- Git
+### Homebrew (Recommended)
+```bash
+# Install via Homebrew
+brew install kyotalab/tools/hawk
+
+# Or install from the main repository
+brew tap kyotalab/tools
+brew install hawk
+```
 
 ### Build from Source
 ```bash
+# Prerequisites: Rust 1.70 or later
 git clone https://github.com/kyotalab/hawk.git
 cd hawk
 cargo build --release
-```
 
-### Add to PATH
-```bash
-# Linux/macOS
+# Add to PATH
 sudo cp target/release/hawk /usr/local/bin/
-
-# Or add to your shell profile
-echo 'export PATH="$PATH:/path/to/hawk/target/release"' >> ~/.bashrc
 ```
+
+### Binary Releases
+Download pre-built binaries from [GitHub Releases](https://github.com/kyotalab/hawk/releases)
+- Linux (x86_64)
+- macOS (Intel & Apple Silicon)
+- Windows (x86_64)
 
 ## 📚 Documentation
 
@@ -369,4 +374,4 @@ hawk '.spec.containers[] | select(.resources.limits.memory)' deployment.yaml
 
 **Happy data exploring with hawk!** 🦅
 
-For questions, issues, or feature requests, please visit our [GitHub repository](https://github.com/kyotalab/hawk).
+For questions, issues, or feature requests, please visit our [GitHub repository](https://github.com/yourusername/hawk).
