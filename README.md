@@ -28,7 +28,7 @@ Modern data analysis tool for structured data (JSON, YAML, CSV)
 ### Installation
 ```bash
 # Install via Homebrew (macOS/Linux)
-brew install kyotalab/tap/hawk
+brew install kyotalab/tools/hawk
 
 # Verify installation
 hawk --version
