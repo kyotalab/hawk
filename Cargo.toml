@@ -1,5 +1,5 @@
 [package]
-name = "hawk"
+name = "hawk-data"
 version = "0.1.0"
 edition = "2024"
 authors = ["Kyota <jagbvg.eptpeox@gmail.com>"]
@@ -11,6 +11,9 @@ repository = "https://github.com/kyotalab/hawk"
 keywords = ["awk", "cli", "jq", "analysis"]
 categories = ["command-line-utilities"]
 
+[[bin]]
+name = "hawk"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.98"
