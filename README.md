@@ -30,6 +30,9 @@ Modern data analysis tool for structured data (JSON, YAML, CSV)
 # Install via Homebrew (macOS/Linux)
 brew install kyotalab/tools/hawk
 
+# Support by cargo install（If Rust is installed）
+cargo install hawk-data
+
 # Verify installation
 hawk --version
 ```
@@ -265,6 +268,11 @@ brew install kyotalab/tools/hawk
 # Or install from the main repository
 brew tap kyotalab/tools
 brew install hawk
+```
+
+### Supported by Cargo install (If Rust is installed)
+```bash
+cargo install hawk-data
 ```
 
 ### Build from Source
