@@ -1,5 +1,5 @@
 use anyhow::Result;
-use hawk::{Error, execute_query, setup};
+use hawk_data::{Error, execute_query, setup};
 
 fn main() -> Result<(), Error> {
     let result = run();
