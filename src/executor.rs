@@ -161,93 +161,6 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
     }
 }
 
-// pub fn handle_nested_field_access(json: &Value, fields: Vec<&str>) -> Result<Vec<Value>, Error> {
-//     if fields.is_empty() {
-//         return Ok(vec![json.clone()]);
-//     }
-
-//     let field = fields[0];
-//     let remaining_fields = if fields.len() > 1 {
-//         fields[1..].to_vec()
-//     } else {
-//         vec![]
-//     };
-
-//     // 配列アクセス [0], [] の処理
-//     if field.contains('[') && field.contains(']') {
-//         let (idx, ridx) = parse_array_segment(field)?;
-//         let key = &field[..idx];
-//         let bracket_content = &field[idx + 1..ridx];
-
-//         if let Some(array_or_object) = json.get(key) {
-//             if bracket_content.is_empty() {
-//                 // 空括弧 [] → 配列全体にアクセス
-//                 if let Value::Array(arr) = array_or_object {
-//                     if remaining_fields.is_empty() {
-//                         // 残りフィールドなし → 配列全体を返す
-//                         Ok(arr.clone())
-//                     } else {
-//                         // 残りフィールドあり → 各要素に適用
-//                         let mut results = Vec::new();
-//                         for item in arr {
-//                             if let Ok(mut item_results) =
-//                                 handle_nested_field_access(item, remaining_fields.clone())
-//                             {
-//                                 results.append(&mut item_results);
-//                             }
-//                         }
-//                         Ok(results)
-//                     }
-//                 } else {
-//                     Err(Error::InvalidQuery(
-//                         format!("Cannot iterate over non-array field '{}'", key).into(),
-//                     ))
-//                 }
-//             } else {
-//                 // 数値インデックス [0] → 特定要素にアクセス
-//                 let index = bracket_content.parse::<usize>().map_err(|e| {
-//                     Error::InvalidQuery(
-//                         format!("Invalid array index '{}': {}", bracket_content, e).into(),
-//                     )
-//                 })?;
-
-//                 if let Value::Array(arr) = array_or_object {
-//                     if let Some(item) = arr.get(index) {
-//                         if remaining_fields.is_empty() {
-//                             Ok(vec![item.clone()])
-//                         } else {
-//                             handle_nested_field_access(item, remaining_fields)
-//                         }
-//                     } else {
-//                         Err(Error::IndexOutOfBounds(index))
-//                     }
-//                 } else {
-//                     Err(Error::InvalidQuery(
-//                         format!("Cannot index non-array field '{}'", key).into(),
-//                     ))
-//                 }
-//             }
-//         } else {
-//             Err(Error::InvalidQuery(
-//                 format!("Field '{}' not found", key).into(),
-//             ))
-//         }
-//     } else {
-//         // 通常のフィールドアクセス
-//         if let Some(value) = json.get(field) {
-//             if remaining_fields.is_empty() {
-//                 Ok(vec![value.clone()])
-//             } else {
-//                 handle_nested_field_access(value, remaining_fields)
-//             }
-//         } else {
-//             Err(Error::InvalidQuery(
-//                 format!("Field '{}' not found", field).into(),
-//             ))
-//         }
-//     }
-// }
-
 pub fn handle_nested_field_access(json: &Value, fields: Vec<&str>) -> Result<Vec<Value>, Error> {
     // println!("=== handle_nested_field_access Debug ===");
     // println!("Input JSON type: {:?}", json);
@@ -486,7 +399,7 @@ pub fn handle_single_access_as_json(
             }
         } else {
             // 通常のフィールドアクセス
-            println!("Normal field access: '{}'", field);
+            // println!("Normal field access: '{}'", field);
             current = current
                 .get(field)
                 .ok_or(Error::InvalidQuery(format!("Field '{}' not found", field)))?;
