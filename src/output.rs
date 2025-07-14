@@ -1,5 +1,6 @@
 use indexmap::IndexSet;
 use serde_json::Value;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use crate::{Error, OutputFormat, value_to_string};
 
@@ -11,26 +12,80 @@ enum DataType {
     Mixed,       // Other complex structures
 }
 
+/// カラー出力設定
+struct ColorScheme {
+    header: ColorSpec,
+    number: ColorSpec,
+    string: ColorSpec,
+    boolean: ColorSpec,
+    null: ColorSpec,
+    array_info: ColorSpec,
+}
+
+impl ColorScheme {
+    fn new() -> Self {
+        let mut header = ColorSpec::new();
+        header.set_fg(Some(Color::Blue)).set_bold(true);
+        
+        let mut number = ColorSpec::new();
+        number.set_fg(Some(Color::Green));
+        
+        let mut boolean = ColorSpec::new();
+        boolean.set_fg(Some(Color::Yellow));
+        
+        let mut null = ColorSpec::new();
+        null.set_fg(Some(Color::Black)).set_intense(true); // グレー
+        
+        let mut array_info = ColorSpec::new();
+        array_info.set_fg(Some(Color::Cyan));
+        
+        Self {
+            header,
+            number,
+            string: ColorSpec::new(), // デフォルト色
+            boolean,
+            null,
+            array_info,
+        }
+    }
+}
+
+/// TTY判定とカラー出力の可否
+fn should_use_colors() -> bool {
+    std::io::IsTerminal::is_terminal(&std::io::stdout()) 
+        && std::env::var("NO_COLOR").is_err()
+}
+
+/// 値の型に応じたカラースペックを取得
+fn get_color_for_value<'a>(value: &Value, colors: &'a ColorScheme) -> &'a ColorSpec {
+    match value {
+        Value::Number(_) => &colors.number,
+        Value::Bool(_) => &colors.boolean,
+        Value::Null => &colors.null,
+        _ => &colors.string,
+    }
+}
+
 pub fn format_output(data: &[Value], format: OutputFormat) -> Result<(), Error> {
     if data.is_empty() {
         return Ok(());
     }
 
+    let use_colors = should_use_colors();
+
     match format {
         OutputFormat::Json => {
             // 明示的にJSON出力
-            // Explicitly output JSON
-            print_as_json(data)?;
+            print_as_json(data, use_colors)?;
         }
         OutputFormat::Table => {
             // 明示的にテーブル出力（可能な場合）
-            // Explicitly output table (if possible)
             if is_object_array(data) {
-                print_as_table(data);
+                print_as_table(data, use_colors)?;
             } else {
                 let flattened = flatten_nested_arrays(data);
                 if is_object_array(&flattened) {
-                    print_as_table(&flattened);
+                    print_as_table(&flattened, use_colors)?;
                 } else {
                     return Err(Error::InvalidQuery(
                         "Cannot display as table: data is not object array".into(),
@@ -40,26 +95,24 @@ pub fn format_output(data: &[Value], format: OutputFormat) -> Result<(), Error> 
         }
         OutputFormat::List => {
             // 明示的にリスト出力
-            // Explicitly output list
-            print_as_list(data);
+            print_as_list(data, use_colors)?;
         }
         OutputFormat::Auto => {
             // 既存のスマート判定ロジック
-            // Existing smart judgment logic
             match analyze_data_structure(data) {
-                DataType::SimpleList => print_as_list(data),
-                DataType::ObjectArray => print_as_table(data),
+                DataType::SimpleList => print_as_list(data, use_colors)?,
+                DataType::ObjectArray => print_as_table(data, use_colors)?,
                 DataType::NestedArray => {
                     let flattened = flatten_nested_arrays(data);
                     if is_object_array(&flattened) {
-                        print_as_table(&flattened);
+                        print_as_table(&flattened, use_colors)?;
                     } else if is_simple_values(&flattened) {
-                        print_as_list(&flattened);
+                        print_as_list(&flattened, use_colors)?;
                     } else {
-                        print_as_json(data)?;
+                        print_as_json(data, use_colors)?;
                     }
                 }
-                DataType::Mixed => print_as_json(data)?,
+                DataType::Mixed => print_as_json(data, use_colors)?,
             }
         }
     }
@@ -77,7 +130,6 @@ fn analyze_data_structure(data: &[Value]) -> DataType {
     }
 
     // ネストした配列かチェック
-    // Check for nested arrays
     if data.len() == 1 && data[0].is_array() {
         return DataType::NestedArray;
     }
@@ -92,7 +144,6 @@ fn flatten_nested_arrays(data: &[Value]) -> Vec<Value> {
         match item {
             Value::Array(arr) => {
                 // 配列の中身を展開
-                // Expand the contents of the array
                 flattened.extend(arr.iter().cloned());
             }
             _ => {
@@ -109,7 +160,6 @@ fn collect_flattened_fields_ordered(value: &Value, prefix: &str, fields: &mut In
         Value::Object(obj) => {
             for (key, val) in obj {
                 // serde_json::Mapは順序を保持
-                // serde_json::Map preserves order
                 let field_name = if prefix.is_empty() {
                     key.clone()
                 } else {
@@ -148,7 +198,6 @@ fn get_flattened_value(item: &Value, field_path: &str) -> String {
     match current {
         Value::Array(arr) => {
             // 配列は簡略表示
-            // Arrays are displayed in simplified form.
             format!("[{} items]", arr.len())
         }
         _ => value_to_string(current),
@@ -186,26 +235,47 @@ fn is_object_array(data: &[Value]) -> bool {
     data.iter().all(|v| v.is_object())
 }
 
-fn print_as_list(data: &[Value]) {
-    data.iter().for_each(|item| {
-        println!("{}", value_to_string(item));
-    });
-}
-
-fn print_as_json(data: &[Value]) -> Result<(), Error> {
-    let json = serde_json::to_string_pretty(data).map_err(|e| Error::Json(e))?;
-
-    println!("{}", json);
+fn print_as_list(data: &[Value], use_colors: bool) -> Result<(), Error> {
+    if use_colors {
+        let mut stdout = StandardStream::stdout(ColorChoice::Always);
+        let colors = ColorScheme::new();
+        
+        for item in data {
+            let color = get_color_for_value(item, &colors);
+            stdout.set_color(color)?;
+            print!("{}", value_to_string(item));
+            stdout.reset()?;
+            println!();
+        }
+    } else {
+        data.iter().for_each(|item| {
+            println!("{}", value_to_string(item));
+        });
+    }
+    
     Ok(())
 }
 
-fn print_as_table(data: &[Value]) {
+fn print_as_json(data: &[Value], use_colors: bool) -> Result<(), Error> {
+    let json = serde_json::to_string_pretty(data).map_err(|e| Error::Json(e))?;
+
+    if use_colors {
+        // JSONのシンタックスハイライトは複雑なので、将来の拡張として
+        // 現在はプレーンテキストで出力
+        println!("{}", json);
+    } else {
+        println!("{}", json);
+    }
+    
+    Ok(())
+}
+
+fn print_as_table(data: &[Value], use_colors: bool) -> Result<(), Error> {
     if data.is_empty() {
-        return;
+        return Ok(());
     }
 
     // 1. 全オブジェクトからフラット化されたフィールド名を収集
-    // 1. Collect flattened field names from all objects
     let mut all_fields = IndexSet::new();
     for item in data {
         collect_flattened_fields_ordered(item, "", &mut all_fields);
@@ -214,17 +284,14 @@ fn print_as_table(data: &[Value]) {
     let fields: Vec<String> = all_fields.into_iter().collect();
 
     // 2. 各列の最大幅を計算
-    // 2. Calculate the maximum width of each column
     let mut max_widths = vec![0; fields.len()];
 
     // ヘッダーの幅
-    // Header width
     for (i, field) in fields.iter().enumerate() {
         max_widths[i] = field.len();
     }
 
     // データの幅
-    // Data width
     for item in data {
         for (i, field) in fields.iter().enumerate() {
             let value_str = get_flattened_value(item, field);
@@ -232,8 +299,55 @@ fn print_as_table(data: &[Value]) {
         }
     }
 
+    if use_colors {
+        print_colored_table(data, &fields, &max_widths)?;
+    } else {
+        print_plain_table(data, &fields, &max_widths);
+    }
+
+    Ok(())
+}
+
+fn print_colored_table(data: &[Value], fields: &[String], max_widths: &[usize]) -> Result<(), Error> {
+    let mut stdout = StandardStream::stdout(ColorChoice::Always);
+    let colors = ColorScheme::new();
+
+    // 3. ヘッダー出力（色付き）
+    stdout.set_color(&colors.header)?;
+    for (i, field) in fields.iter().enumerate() {
+        print!("{:<width$}", field, width = max_widths[i]);
+        if i < fields.len() - 1 {
+            print!("  ");
+        }
+    }
+    stdout.reset()?;
+    println!();
+
+    // 4. データ行出力（色付き）
+    for item in data {
+        for (i, field) in fields.iter().enumerate() {
+            let value_str = get_flattened_value(item, field);
+            
+            // 値の型に応じて色を設定
+            let value = get_field_value_for_coloring(item, field);
+            let color = get_color_for_value(&value, &colors);
+            
+            stdout.set_color(color)?;
+            print!("{:<width$}", value_str, width = max_widths[i]);
+            stdout.reset()?;
+            
+            if i < fields.len() - 1 {
+                print!("  ");
+            }
+        }
+        println!();
+    }
+
+    Ok(())
+}
+
+fn print_plain_table(data: &[Value], fields: &[String], max_widths: &[usize]) {
     // 3. ヘッダー出力
-    // 3. Header output
     for (i, field) in fields.iter().enumerate() {
         print!("{:<width$}", field, width = max_widths[i]);
         if i < fields.len() - 1 {
@@ -243,7 +357,6 @@ fn print_as_table(data: &[Value]) {
     println!();
 
     // 4. データ行出力
-    // 4. Data row output
     for item in data {
         for (i, field) in fields.iter().enumerate() {
             let value_str = get_flattened_value(item, field);
@@ -256,16 +369,46 @@ fn print_as_table(data: &[Value]) {
     }
 }
 
+fn get_field_value_for_coloring(item: &Value, field_path: &str) -> Value {
+    let parts: Vec<&str> = field_path.split('.').collect();
+    let mut current = item;
+
+    for part in parts {
+        match current.get(part) {
+            Some(val) => current = val,
+            None => return Value::Null,
+        }
+    }
+
+    current.clone()
+}
+
 pub fn print_data_info(data: &[Value]) {
+    let use_colors = should_use_colors();
+    
+    if use_colors {
+        print_colored_data_info(data).unwrap_or_else(|_| print_plain_data_info(data));
+    } else {
+        print_plain_data_info(data);
+    }
+}
+
+fn print_colored_data_info(data: &[Value]) -> Result<(), Error> {
+    let mut stdout = StandardStream::stdout(ColorChoice::Always);
+    let colors = ColorScheme::new();
+
+    // タイトル
+    stdout.set_color(&colors.header)?;
     println!("=== Data Information ===");
+    stdout.reset()?;
+    
     println!("Total records: {}", data.len());
 
     if data.is_empty() {
-        return;
+        return Ok(());
     }
 
     // データ型の分析
-    // Analysis of data types
     let first_item = &data[0];
     match first_item {
         Value::Object(obj) => {
@@ -274,7 +417,83 @@ pub fn print_data_info(data: &[Value]) {
             println!();
 
             // フィールド一覧と型情報
-            // Field list and type information
+            stdout.set_color(&colors.header)?;
+            println!("Field Details:");
+            stdout.reset()?;
+            
+            for (key, value) in obj {
+                let field_type = get_value_type_info(value);
+                let sample_value = get_sample_value(value);
+                
+                // フィールド名を色付き
+                stdout.set_color(&colors.string)?;
+                print!("  {:<15}", key);
+                stdout.reset()?;
+                
+                // 型情報を色付き
+                let type_color = get_color_for_value(value, &colors);
+                stdout.set_color(type_color)?;
+                print!(" {:<10}", field_type);
+                stdout.reset()?;
+                
+                println!(" (e.g., {})", sample_value);
+            }
+
+            // 配列フィールドの詳細
+            println!();
+            stdout.set_color(&colors.header)?;
+            println!("Array Fields:");
+            stdout.reset()?;
+            
+            for (key, value) in obj {
+                if let Value::Array(arr) = value {
+                    stdout.set_color(&colors.array_info)?;
+                    print!("  {:<15}", key);
+                    stdout.reset()?;
+                    println!(" [{} items]", arr.len());
+                    
+                    if let Some(first_elem) = arr.get(0) {
+                        if let Value::Object(elem_obj) = first_elem {
+                            print!("    └─ ");
+                            let sub_fields: Vec<&String> = elem_obj.keys().collect();
+                            let sub_fields: Vec<&str> =
+                                sub_fields.into_iter().map(|f| f.as_str()).collect();
+                            println!("{}", sub_fields.join(", "));
+                        }
+                    }
+                }
+            }
+        }
+        Value::Array(_) => {
+            println!("Type: Nested Array");
+            // ネストした配列の詳細
+        }
+        _ => {
+            println!("Type: Simple Values");
+            // プリミティブ値の統計
+        }
+    }
+
+    Ok(())
+}
+
+fn print_plain_data_info(data: &[Value]) {
+    println!("=== Data Information ===");
+    println!("Total records: {}", data.len());
+
+    if data.is_empty() {
+        return;
+    }
+
+    // データ型の分析
+    let first_item = &data[0];
+    match first_item {
+        Value::Object(obj) => {
+            println!("Type: Object Array");
+            println!("Fields: {}", obj.len());
+            println!();
+
+            // フィールド一覧と型情報
             println!("Field Details:");
             for (key, value) in obj {
                 let field_type = get_value_type_info(value);
@@ -283,7 +502,6 @@ pub fn print_data_info(data: &[Value]) {
             }
 
             // 配列フィールドの詳細
-            // Details of array fields
             println!();
             println!("Array Fields:");
             for (key, value) in obj {
@@ -304,12 +522,10 @@ pub fn print_data_info(data: &[Value]) {
         Value::Array(_) => {
             println!("Type: Nested Array");
             // ネストした配列の詳細
-            // Details of nested arrays
         }
         _ => {
             println!("Type: Simple Values");
             // プリミティブ値の統計
-            // Statistics on primitive values
         }
     }
 }
