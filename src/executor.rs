@@ -265,60 +265,6 @@ pub fn handle_nested_field_access(json: &Value, fields: Vec<&str>) -> Result<Vec
     }
 }
 
-// pub fn handle_single_access_as_json(
-//     json: &Value,
-//     key: &str,
-//     index: usize,
-//     fields: Vec<&str>,
-// ) -> Result<Value, Error> {
-//     let values = json
-//         .get(key)
-//         .ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
-//     let mut current = values.get(index).ok_or(Error::IndexOutOfBounds(index))?;
-
-//     for field in fields {
-//         if field.contains('[') && field.contains(']') {
-//             let (idx, ridx) = parse_array_segment(field)?;
-//             let field_key = field
-//                 .get(..idx)
-//                 .ok_or(Error::InvalidQuery("Invalid field".into()))?;
-//             let index_str = field
-//                 .get(idx + 1..ridx)
-//                 .ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
-
-//             // field_key でアクセス
-//             let array = current.get(field_key).ok_or(Error::InvalidQuery(format!(
-//                 "Field '{}' not found",
-//                 field_key
-//             )))?;
-
-//             if index_str.is_empty() {
-//                 // **重要: 空括弧 [] の場合は配列全体を返す**
-//                 if let Value::Array(arr) = array {
-//                     return Ok(Value::Array(arr.clone()));
-//                 } else {
-//                     return Err(Error::InvalidQuery(
-//                         format!("Field '{}' is not an array", field_key).into(),
-//                     ));
-//                 }
-//             } else {
-//                 // 数値インデックスの場合
-//                 let field_index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
-//                 current = array
-//                     .get(field_index)
-//                     .ok_or(Error::IndexOutOfBounds(field_index))?;
-//             }
-//         } else {
-//             // 通常のフィールドアクセス
-//             current = current
-//                 .get(field)
-//                 .ok_or(Error::InvalidQuery(format!("Field '{}' not found", field)))?;
-//         }
-//     }
-
-//     Ok(current.clone())
-// }
-
 pub fn handle_single_access_as_json(
     json: &Value,
     key: &str,

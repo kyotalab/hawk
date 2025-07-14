@@ -204,6 +204,20 @@ fn get_flattened_value(item: &Value, field_path: &str) -> String {
     }
 }
 
+fn get_field_value_for_coloring(item: &Value, field_path: &str) -> Value {
+    let parts: Vec<&str> = field_path.split('.').collect();
+    let mut current = item;
+
+    for part in parts {
+        match current.get(part) {
+            Some(val) => current = val,
+            None => return Value::Null,
+        }
+    }
+
+    current.clone()
+}
+
 fn get_value_type_info(value: &Value) -> &'static str {
     match value {
         Value::String(_) => "String",
@@ -257,14 +271,95 @@ fn print_as_list(data: &[Value], use_colors: bool) -> Result<(), Error> {
 }
 
 fn print_as_json(data: &[Value], use_colors: bool) -> Result<(), Error> {
-    let json = serde_json::to_string_pretty(data).map_err(|e| Error::Json(e))?;
-
     if use_colors {
-        // JSONのシンタックスハイライトは複雑なので、将来の拡張として
-        // 現在はプレーンテキストで出力
-        println!("{}", json);
+        print_colored_json_simple(data)?;
     } else {
+        let json = serde_json::to_string_pretty(data).map_err(|e| Error::Json(e))?;
         println!("{}", json);
+    }
+    
+    Ok(())
+}
+
+fn print_colored_json_simple(data: &[Value]) -> Result<(), Error> {
+    let mut stdout = StandardStream::stdout(ColorChoice::Always);
+    let colors = ColorScheme::new();
+    
+    // シンプルなアプローチ：行ごとに処理
+    let json = serde_json::to_string_pretty(data).map_err(|e| Error::Json(e))?;
+    
+    for line in json.lines() {
+        let trimmed = line.trim();
+        
+        // 行の内容に応じて色付け
+        if trimmed.starts_with('"') && trimmed.contains(':') {
+            // キー行: "key": value
+            if let Some(colon_pos) = trimmed.find(':') {
+                let key_part = &trimmed[..colon_pos + 1];
+                let value_part = &trimmed[colon_pos + 1..].trim();
+                
+                // インデントを保持
+                let indent = &line[..line.len() - line.trim_start().len()];
+                print!("{}", indent);
+                
+                // キー部分（青色）
+                stdout.set_color(&colors.header)?;
+                print!("{}", key_part);
+                stdout.reset()?;
+                
+                print!(" ");
+                
+                // 値部分（型に応じた色）
+                print_colored_json_value(value_part, &colors, &mut stdout)?;
+                println!();
+            } else {
+                println!("{}", line);
+            }
+        } else if trimmed.starts_with('{') || trimmed.starts_with('}') || 
+                  trimmed.starts_with('[') || trimmed.starts_with(']') {
+            // 構造文字（青色）
+            let indent = &line[..line.len() - line.trim_start().len()];
+            print!("{}", indent);
+            stdout.set_color(&colors.header)?;
+            print!("{}", trimmed);
+            stdout.reset()?;
+            println!();
+        } else {
+            // その他の行（配列要素など）
+            let indent = &line[..line.len() - line.trim_start().len()];
+            print!("{}", indent);
+            print_colored_json_value(trimmed, &colors, &mut stdout)?;
+            println!();
+        }
+    }
+    
+    Ok(())
+}
+
+fn print_colored_json_value(value_str: &str, colors: &ColorScheme, stdout: &mut StandardStream) -> Result<(), Error> {
+    let clean_value = value_str.trim_end_matches(',');
+    
+    if clean_value == "null" {
+        stdout.set_color(&colors.null)?;
+        print!("{}", value_str);
+        stdout.reset()?;
+    } else if clean_value == "true" || clean_value == "false" {
+        stdout.set_color(&colors.boolean)?;
+        print!("{}", value_str);
+        stdout.reset()?;
+    } else if clean_value.starts_with('"') && clean_value.ends_with('"') {
+        // 文字列値
+        stdout.set_color(&colors.string)?;
+        print!("{}", value_str);
+        stdout.reset()?;
+    } else if clean_value.parse::<f64>().is_ok() {
+        // 数値
+        stdout.set_color(&colors.number)?;
+        print!("{}", value_str);
+        stdout.reset()?;
+    } else {
+        // その他
+        print!("{}", value_str);
     }
     
     Ok(())
@@ -367,20 +462,6 @@ fn print_plain_table(data: &[Value], fields: &[String], max_widths: &[usize]) {
         }
         println!();
     }
-}
-
-fn get_field_value_for_coloring(item: &Value, field_path: &str) -> Value {
-    let parts: Vec<&str> = field_path.split('.').collect();
-    let mut current = item;
-
-    for part in parts {
-        match current.get(part) {
-            Some(val) => current = val,
-            None => return Value::Null,
-        }
-    }
-
-    current.clone()
 }
 
 pub fn print_data_info(data: &[Value]) {
