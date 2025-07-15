@@ -1,10 +1,5 @@
 2024-01-15 09:00:01 INFO Application started successfully
 2024-01-15 09:00:02 DEBUG Loading configuration from /etc/app/config.json
-2024-01-15 09:00:03 INFO Database connection established
-2024-01-15 09:00:15 WARN High memory usage detected: 85%
 2024-01-15 09:01:23 ERROR Failed to process user request: connection timeout
 2024-01-15 09:01:24 INFO Retrying connection...
-2024-01-15 09:01:25 INFO Connection restored
-2024-01-15 09:02:45 DEBUG Processing batch job #1234
-2024-01-15 09:03:12 ERROR Database query failed: table 'users' not found
-2024-01-15 09:03:13 FATAL Application crashed, shutting down
+2024-01-15 09:02:45 WARN High memory usage detected: 85%

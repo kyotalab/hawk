@@ -1,9 +1,6 @@
-id,name,email,age,department,salary,join_date,active
-1,Alice Johnson,alice@example.com,28,Engineering,95000,2020-03-15,true
-2,Bob Smith,bob@example.com,35,Marketing,78000,2019-07-22,true
-3,Carol Williams,carol@example.com,42,Engineering,120000,2018-01-10,false
-4,David Brown,david@gmail.com,29,Sales,65000,2021-09-05,true
-5,Eva Garcia,eva@example.com,31,Design,85000,2020-11-18,true
-6,Frank Wilson,frank@example.com,38,Engineering,105000,2017-05-30,true
-7,Grace Lee,grace@example.com,26,HR,58000,2022-02-14,true
-8,Henry Martinez,henry@gmail.com,45,Finance,92000,2016-08-12,true
+name,age,department,salary
+Alice,30,Engineering,95000
+Bob,25,Marketing,78000
+Carol,35,Engineering,105000
+David,28,Sales,82000
+Eve,32,Marketing,88000
