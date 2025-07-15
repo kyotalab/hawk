@@ -25,4 +25,10 @@ pub enum Error {
 
     #[error("Array index out of bounds: {0}")]
     IndexOutOfBounds(usize),
+
+    #[error("Text processing error: {0}")]
+    TextProcessing(String),
+
+    #[error("String operation error: {0}")]
+    StringOperation(String),
 }

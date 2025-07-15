@@ -1,0 +1,6 @@
+Jan 15 09:00:01 mailserver postfix/smtp[12345]: 4A2F5C001: to=<user@example.com>, relay=smtp.gmail.com[74.125.142.108]:587, delay=0.84, delays=0.02/0.01/0.41/0.40, dsn=2.0.0, status=sent (250 2.0.0 OK)
+Jan 15 09:00:15 mailserver postfix/qmgr[12346]: 4A2F5C001: removed
+Jan 15 09:01:23 mailserver postfix/smtpd[12347]: connect from unknown[203.0.113.1]
+Jan 15 09:01:24 mailserver postfix/smtpd[12347]: warning: unknown[203.0.113.1]: SASL login authentication failed
+Jan 15 09:01:25 mailserver postfix/smtpd[12347]: disconnect from unknown[203.0.113.1] ehlo=1 auth=0/1 quit=1 commands=2/3
+Jan 15 09:02:45 mailserver postfix/smtp[12348]: 4A2F5C002: to=<admin@company.com>, relay=mail.company.com[192.168.1.50]:25, delay=1.2, status=sent

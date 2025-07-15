@@ -5,6 +5,7 @@ pub mod filter;
 pub mod output;
 pub mod parser;
 pub mod setup;
+pub mod string_ops;
 pub mod utils;
 
 pub use arg::*;
@@ -15,6 +16,7 @@ pub use output::*;
 pub use parser::*;
 use serde_json::Value;
 pub use setup::*;
+pub use string_ops::*;
 pub use utils::*;
 
 pub fn debug_json_order(json: &Value) {

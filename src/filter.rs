@@ -1,24 +1,18 @@
 use serde_json::Value;
 
-use crate::{Error, print_data_info, value_to_string};
+use crate::{Error, print_data_info, value_to_string, string_ops};
 
 pub fn apply_simple_filter(data: Vec<Value>, filter: &str) -> Result<Vec<Value>, Error> {
     if filter.starts_with("select(") && filter.ends_with(")") {
         // "select(.age > 30)" から ".age > 30" を抽出
         let condition = &filter[7..filter.len() - 1];
 
-        // 条件をパース
-        // Parse conditions
-        let (field_path, operator, value) = parse_condition(condition)?;
-
-        // フィルタリングを実行
-        // Execute filtering
-        let filtered: Vec<Value> = data
-            .into_iter()
-            .filter(|item| evaluate_condition(item, &field_path, &operator, &value))
-            .collect();
-
-        Ok(filtered)
+        // パイプラインがある場合の処理
+        if condition.contains(" | ") {
+            apply_filter_with_string_operations(data, condition)
+        } else {
+            apply_existing_simple_filter(data, condition)
+        }
     } else {
         Err(Error::InvalidQuery(format!(
             "Unsupported filter: {}",
@@ -27,14 +21,77 @@ pub fn apply_simple_filter(data: Vec<Value>, filter: &str) -> Result<Vec<Value>,
     }
 }
 
+/// 文字列操作付きフィルタの適用
+fn apply_filter_with_string_operations(data: Vec<Value>, condition: &str) -> Result<Vec<Value>, Error> {
+    let parts: Vec<&str> = condition.split(" | ").map(|s| s.trim()).collect();
+    
+    if parts.len() < 2 {
+        return Err(Error::InvalidQuery("Invalid filter condition".to_string()));
+    }
+    
+    let field_access = parts[0];
+    let string_operations: Vec<&str> = parts[1..].iter().cloned().collect();
+    
+    // 最後の操作は比較操作である必要がある
+    let last_operation = string_operations.last().ok_or_else(|| {
+        Error::InvalidQuery("Missing comparison operation".to_string())
+    })?;
+    
+    if !is_comparison_operation(last_operation) {
+        return Err(Error::InvalidQuery("Last operation must be a comparison".to_string()));
+    }
+    
+    let mut results = Vec::new();
+    
+    for item in data {
+        // フィールド値を取得
+        let field_value = extract_field_value(&item, field_access)?;
+        
+        // 文字列操作を適用（比較操作まで）
+        let final_value = string_ops::apply_string_pipeline(&field_value, &string_operations)?;
+        
+        // 比較結果が true の場合のみ追加
+        if let Value::Bool(true) = final_value {
+            results.push(item);
+        }
+    }
+    
+    Ok(results)
+}
+
+/// 比較操作かどうかを判定
+fn is_comparison_operation(operation: &str) -> bool {
+    operation.starts_with("contains(") ||
+    operation.starts_with("starts_with(") ||
+    operation.starts_with("ends_with(") ||
+    operation == "==" ||
+    operation == "!=" ||
+    operation.starts_with("== ") ||
+    operation.starts_with("!= ")
+}
+
+/// 既存のシンプルフィルタ処理
+fn apply_existing_simple_filter(data: Vec<Value>, condition: &str) -> Result<Vec<Value>, Error> {
+    // 条件をパース
+    let (field_path, operator, value) = parse_condition(condition)?;
+
+    // フィルタリングを実行
+    let filtered: Vec<Value> = data
+        .into_iter()
+        .filter(|item| evaluate_condition(item, &field_path, &operator, &value))
+        .collect();
+
+    Ok(filtered)
+}
+
 pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec<Value>, Error> {
-    if operation.starts_with("select(") && operation.ends_with(")") {
+    let trimmed_op = operation.trim();
+    
+    if trimmed_op.starts_with("select(") && trimmed_op.ends_with(")") {
         // フィルタリング操作
-        // Filtering operations
-        apply_simple_filter(data, operation)
-    } else if operation == "count" {
+        apply_simple_filter(data, trimmed_op)
+    } else if trimmed_op == "count" {
         // カウント操作
-        // Count operation
         if is_grouped_data(&data) {
             apply_aggregation_to_groups(data, "count", "")
         } else {
@@ -42,24 +99,24 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
             let count_value = Value::Number(serde_json::Number::from(count));
             Ok(vec![count_value])
         }
-    } else if operation.starts_with("select_fields(") && operation.ends_with(")") {
-        // **新規追加: 複数フィールド選択**
-        let fields_str = &operation[14..operation.len() - 1]; // "name,age,department"
+    } else if trimmed_op.starts_with("map(") && trimmed_op.ends_with(")") {
+        apply_map_operation(data, trimmed_op)
+    } else if trimmed_op.starts_with("select_fields(") && trimmed_op.ends_with(")") {
+        // 複数フィールド選択
+        let fields_str = &trimmed_op[14..trimmed_op.len() - 1]; // "name,age,department"
         let field_list: Vec<String> = fields_str
             .split(',')
             .map(|s| s.trim().to_string())
             .collect();
 
         apply_field_selection(data, field_list)
-    } else if operation == "info" {
+    } else if trimmed_op == "info" {
         // info操作
-        // info operation
         print_data_info(&data);
         Ok(vec![]) // Return empty vector
-    } else if operation.starts_with("sum(") && operation.ends_with(")") {
+    } else if trimmed_op.starts_with("sum(") && trimmed_op.ends_with(")") {
         // sum(.field) の処理
-        // Processing of sum(.field)
-        let field = &operation[4..operation.len() - 1];
+        let field = &trimmed_op[4..trimmed_op.len() - 1];
         let field_name = field.trim_start_matches('.');
 
         if is_grouped_data(&data) {
@@ -79,10 +136,9 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
             let sum_value = Value::Number(serde_json::Number::from_f64(round_sum).unwrap());
             Ok(vec![sum_value])
         }
-    } else if operation.starts_with("avg(") && operation.ends_with(")") {
+    } else if trimmed_op.starts_with("avg(") && trimmed_op.ends_with(")") {
         // avg(.field) の処理
-        // Processing of avg(.field)
-        let field = &operation[4..operation.len() - 1];
+        let field = &trimmed_op[4..trimmed_op.len() - 1];
         let field_name = field.trim_start_matches('.');
 
         if is_grouped_data(&data) {
@@ -103,10 +159,9 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
                 Ok(vec![avg_value])
             }
         }
-    } else if operation.starts_with("min(") && operation.ends_with(")") {
+    } else if trimmed_op.starts_with("min(") && trimmed_op.ends_with(")") {
         // min(.field) の処理
-        // Processing of min(.field)
-        let field = &operation[4..operation.len() - 1];
+        let field = &trimmed_op[4..trimmed_op.len() - 1];
         let field_name = field.trim_start_matches('.');
 
         if is_grouped_data(&data) {
@@ -125,10 +180,9 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
                 Ok(vec![min_value])
             }
         }
-    } else if operation.starts_with("max(") && operation.ends_with(")") {
+    } else if trimmed_op.starts_with("max(") && trimmed_op.ends_with(")") {
         // max(.field) の処理
-        // Processing of max(.field)
-        let field = &operation[4..operation.len() - 1];
+        let field = &trimmed_op[4..trimmed_op.len() - 1];
         let field_name = field.trim_start_matches('.');
 
         if is_grouped_data(&data) {
@@ -147,19 +201,116 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
                 Ok(vec![max_value])
             }
         }
-    } else if operation.starts_with("group_by(") && operation.ends_with(")") {
+    } else if trimmed_op.starts_with("group_by(") && trimmed_op.ends_with(")") {
         // group_by(.department) の処理
-        // Processing of group_by(.field)
-        let field = &operation[9..operation.len() - 1];
+        let field = &trimmed_op[9..trimmed_op.len() - 1];
         let field_name = field.trim_start_matches('.');
 
         let grouped = group_data_by_field(data, field_name)?;
         Ok(grouped)
     } else {
+        // より詳細なエラーメッセージ
         Err(Error::InvalidQuery(format!(
-            "Unsupported operation: {}",
-            operation
+            "Unsupported operation: '{}' (length: {}, starts with 'map(': {}, ends with ')': {})",
+            trimmed_op, 
+            trimmed_op.len(),
+            trimmed_op.starts_with("map("),
+            trimmed_op.ends_with(")")
         )))
+    }
+}
+
+/// map操作の実装
+fn apply_map_operation(data: Vec<Value>, operation: &str) -> Result<Vec<Value>, Error> {
+    // "map(.field | string_operation)" の解析
+    let content = &operation[4..operation.len() - 1]; // "map(" と ")" を除去
+    
+    let (field_access, string_operations) = parse_map_content(content)?;
+    
+    let mut results = Vec::new();
+    
+    for item in data {
+        // フィールドにアクセス
+        let field_value = extract_field_value(&item, &field_access)?;
+        
+        // 文字列操作を適用
+        let transformed_value = apply_string_operations(&field_value, &string_operations)?;
+        
+        // 元のオブジェクトを更新または新しい値を作成
+        let result = update_or_create_value(&item, &field_access, transformed_value)?;
+        results.push(result);
+    }
+    
+    Ok(results)
+}
+
+/// map操作の内容を解析（例: ".name | upper | trim"）
+fn parse_map_content(content: &str) -> Result<(String, Vec<String>), Error> {
+    let parts: Vec<&str> = content.split('|').map(|s| s.trim()).collect();
+    
+    if parts.is_empty() {
+        return Err(Error::InvalidQuery("Empty map operation".to_string()));
+    }
+    
+    // 最初の部分はフィールドアクセス
+    let field_access = parts[0].to_string();
+    
+    // 残りは文字列操作
+    let string_operations: Vec<String> = parts[1..].iter().map(|s| s.to_string()).collect();
+    
+    Ok((field_access, string_operations))
+}
+
+/// フィールド値を抽出
+fn extract_field_value(item: &Value, field_access: &str) -> Result<Value, Error> {
+    if field_access == "." {
+        // ルート値（Text配列の場合の各行）
+        return Ok(item.clone());
+    }
+    
+    if field_access.starts_with('.') {
+        let field_name = &field_access[1..]; // '.' を除去
+        
+        if let Some(value) = item.get(field_name) {
+            Ok(value.clone())
+        } else {
+            Err(Error::InvalidQuery(format!("Field '{}' not found", field_name)))
+        }
+    } else {
+        Err(Error::InvalidQuery(format!("Invalid field access: {}", field_access)))
+    }
+}
+
+/// 文字列操作を順次適用
+fn apply_string_operations(value: &Value, operations: &[String]) -> Result<Value, Error> {
+    if operations.is_empty() {
+        return Ok(value.clone());
+    }
+    
+    let operations_str: Vec<&str> = operations.iter().map(|s| s.as_str()).collect();
+    string_ops::apply_string_pipeline(value, &operations_str)
+}
+
+/// 値を更新または新しい値を作成
+fn update_or_create_value(original: &Value, field_access: &str, new_value: Value) -> Result<Value, Error> {
+    if field_access == "." {
+        // ルート値の場合は直接置き換え
+        Ok(new_value)
+    } else if field_access.starts_with('.') {
+        let field_name = &field_access[1..];
+        
+        // オブジェクトの場合はフィールドを更新
+        if let Value::Object(mut obj) = original.clone() {
+            obj.insert(field_name.to_string(), new_value);
+            Ok(Value::Object(obj))
+        } else {
+            // オブジェクトでない場合は新しいオブジェクトを作成
+            let mut new_obj = serde_json::Map::new();
+            new_obj.insert(field_name.to_string(), new_value);
+            Ok(Value::Object(new_obj))
+        }
+    } else {
+        Err(Error::InvalidQuery(format!("Invalid field access: {}", field_access)))
     }
 }
 
@@ -195,7 +346,6 @@ fn group_data_by_field(data: Vec<Value>, field_name: &str) -> Result<Vec<Value>,
     let mut groups: HashMap<String, Vec<Value>> = HashMap::new();
 
     // データをフィールド値でグルーピング
-    // Group data by field values
     for item in data {
         if let Some(field_value) = item.get(field_name) {
             let key = value_to_string(field_value);
@@ -204,7 +354,6 @@ fn group_data_by_field(data: Vec<Value>, field_name: &str) -> Result<Vec<Value>,
     }
 
     // グループを配列として返す
-    // Return the group as an array
     let result: Vec<Value> = groups
         .into_iter()
         .map(|(group_name, group_items)| {
@@ -220,11 +369,9 @@ fn group_data_by_field(data: Vec<Value>, field_name: &str) -> Result<Vec<Value>,
 
 fn parse_condition(condition: &str) -> Result<(String, String, String), Error> {
     // ".age > 30" のような条件をパース
-    // Parse conditions such as “.age > 30”
     let condition = condition.trim();
 
     // 演算子を検出
-    // Detect operators
     if let Some(pos) = condition.find(" > ") {
         let field = condition[..pos].trim().to_string();
         let value = condition[pos + 3..].trim().to_string();
@@ -254,7 +401,6 @@ fn parse_condition(condition: &str) -> Result<(String, String, String), Error> {
 
 fn evaluate_condition(item: &Value, field_path: &str, operator: &str, value: &str) -> bool {
     // フィールドパスから値を取得 (.age -> age)
-    // Get the value from the field path (.age -> age)
     let field_name = if field_path.starts_with('.') {
         &field_path[1..]
     } else {
@@ -305,7 +451,6 @@ fn compare_equal(field_value: &Value, target: &str) -> bool {
     match field_value {
         Value::String(s) => {
             // 文字列比較（引用符を除去）
-            // String comparison (remove quotation marks)
             let target_clean = target.trim_matches('"');
             s == target_clean
         }
@@ -348,7 +493,6 @@ fn apply_aggregation_to_groups(
             let items = group_obj.get("items").and_then(|v| v.as_array()).unwrap();
 
             // 各グループのitemsに対して集約を実行
-            // Perform aggregation on items in each group
             let aggregated_value = match operation {
                 "avg" => calculate_avg(items, field_name)?,
                 "sum" => calculate_sum(items, field_name)?,
@@ -359,7 +503,6 @@ fn apply_aggregation_to_groups(
             };
 
             // 結果オブジェクトを作成
-            // Create result object
             let mut result_obj = serde_json::Map::new();
             result_obj.insert("group".to_string(), group_name.clone());
             result_obj.insert(operation.to_string(), aggregated_value);

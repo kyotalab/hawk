@@ -9,7 +9,7 @@ pub fn execute_query(json: &Value, query: &str, format: OutputFormat) -> Result<
     if query.contains('|') {
         // 複数パイプライン処理
         // Multiple pipeline processing
-        let parts: Vec<&str> = query.split('|').map(|s| s.trim()).collect();
+        let parts = split_pipeline_respecting_parentheses(query)?;
 
         if parts.len() < 2 {
             return Err(Error::InvalidQuery("Invalid pipeline syntax".into()));
@@ -17,8 +17,8 @@ pub fn execute_query(json: &Value, query: &str, format: OutputFormat) -> Result<
 
         // 最初のクエリでデータを取得
         // Retrieve data with the first query
-        let initial_query = parts[0];
-        let mut current_data = execute_basic_query_as_json(json, initial_query)?;
+        let initial_query = parts[0].clone();
+        let mut current_data = execute_basic_query_as_json(json, &initial_query)?;
 
         // 残りのパイプライン操作を順次実行
         // Execute the remaining pipeline operations sequentially.
@@ -518,6 +518,49 @@ pub fn handle_array_access(
 
     Ok(res)
 }
+
+fn split_pipeline_respecting_parentheses(query: &str) -> Result<Vec<String>, Error> {
+
+    let mut parts = Vec::new();
+    let mut current_part = String::new();
+    let mut paren_depth = 0;
+    let mut chars = query.chars().peekable();
+    
+    while let Some(ch) = chars.next() {
+        match ch {
+            '(' => {
+                paren_depth += 1;
+                current_part.push(ch);
+            },
+            ')' => {
+                paren_depth -= 1;
+                current_part.push(ch);
+            },
+            '|' if paren_depth == 0 => {
+                // 括弧の外のパイプのみで分割
+                if !current_part.trim().is_empty() {
+                    parts.push(current_part.trim().to_string());
+                    current_part.clear();
+                }
+            },
+            _ => {
+                current_part.push(ch);
+            }
+        }
+    }
+    
+    // 最後の部分を追加
+    if !current_part.trim().is_empty() {
+        parts.push(current_part.trim().to_string());
+    }
+    
+    if paren_depth != 0 {
+        return Err(Error::InvalidQuery("Unmatched parentheses in query".to_string()));
+    }
+    
+    Ok(parts)
+}
+
 
 #[cfg(test)]
 mod tests {
