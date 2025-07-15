@@ -5,6 +5,7 @@ pub mod filter;
 pub mod output;
 pub mod parser;
 pub mod setup;
+pub mod stats_opts;
 pub mod string_ops;
 pub mod utils;
 
@@ -16,6 +17,7 @@ pub use output::*;
 pub use parser::*;
 use serde_json::Value;
 pub use setup::*;
+pub use stats_opts::*;
 pub use string_ops::*;
 pub use utils::*;
 

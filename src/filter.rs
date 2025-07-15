@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::{Error, print_data_info, value_to_string, string_ops};
+use crate::{apply_stats_operation, Error, print_data_info, value_to_string, string_ops};
 
 pub fn apply_simple_filter(data: Vec<Value>, filter: &str) -> Result<Vec<Value>, Error> {
     if filter.starts_with("select(") && filter.ends_with(")") {
@@ -208,6 +208,66 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
 
         let grouped = group_data_by_field(data, field_name)?;
         Ok(grouped)
+    } else if trimmed_op == "unique" {
+        // unique操作（重複除去）
+        let result = apply_stats_operation(&data, "unique", None)?;
+        if let Value::Array(arr) = result {
+            Ok(arr)
+        } else {
+            Ok(vec![result])
+        }
+    } else if trimmed_op == "sort" {
+        // sort操作
+        let result = apply_stats_operation(&data, "sort", None)?;
+        if let Value::Array(arr) = result {
+            Ok(arr)
+        } else {
+            Ok(vec![result])
+        }
+    } else if trimmed_op == "length" {
+        // length操作（配列の長さ）
+        let result = apply_stats_operation(&data, "length", None)?;
+        Ok(vec![result])
+    } else if trimmed_op == "median" {
+        // median操作（中央値）
+        let result = apply_stats_operation(&data, "median", None)?;
+        Ok(vec![result])
+    } else if trimmed_op == "stddev" {
+        // stddev操作（標準偏差）
+        let result = apply_stats_operation(&data, "stddev", None)?;
+        Ok(vec![result])
+    } else if trimmed_op.starts_with("unique(") && trimmed_op.ends_with(")") {
+        // unique(.field) - フィールド指定
+        let field = &trimmed_op[7..trimmed_op.len() - 1];
+        let field_name = field.trim_start_matches('.');
+        let result = apply_stats_operation(&data, "unique", Some(field_name))?;
+        if let Value::Array(arr) = result {
+            Ok(arr)
+        } else {
+            Ok(vec![result])
+        }
+    } else if trimmed_op.starts_with("sort(") && trimmed_op.ends_with(")") {
+        // sort(.field) - フィールド指定
+        let field = &trimmed_op[5..trimmed_op.len() - 1];
+        let field_name = field.trim_start_matches('.');
+        let result = apply_stats_operation(&data, "sort", Some(field_name))?;
+        if let Value::Array(arr) = result {
+            Ok(arr)
+        } else {
+            Ok(vec![result])
+        }
+    } else if trimmed_op.starts_with("median(") && trimmed_op.ends_with(")") {
+        // median(.field) - フィールド指定
+        let field = &trimmed_op[7..trimmed_op.len() - 1];
+        let field_name = field.trim_start_matches('.');
+        let result = apply_stats_operation(&data, "median", Some(field_name))?;
+        Ok(vec![result])
+    } else if trimmed_op.starts_with("stddev(") && trimmed_op.ends_with(")") {
+        // stddev(.field) - フィールド指定
+        let field = &trimmed_op[7..trimmed_op.len() - 1];
+        let field_name = field.trim_start_matches('.');
+        let result = apply_stats_operation(&data, "stddev", Some(field_name))?;
+        Ok(vec![result])
     } else {
         // より詳細なエラーメッセージ
         Err(Error::InvalidQuery(format!(

@@ -3,42 +3,120 @@ use crate::Error;
 
 /// 文字列操作を適用する
 pub fn apply_string_operation(value: &Value, operation: &str) -> Result<Value, Error> {
-    // 文字列以外の値は操作できない
-    let string_val = match value {
-        Value::String(s) => s,
-        _ => return Err(Error::StringOperation(
-            "String operations can only be applied to string values".to_string()
-        )),
-    };
-
     match operation {
-        "upper" => Ok(Value::String(string_val.to_uppercase())),
-        "lower" => Ok(Value::String(string_val.to_lowercase())),
-        "trim" => Ok(Value::String(string_val.trim().to_string())),
-        "trim_start" => Ok(Value::String(string_val.trim_start().to_string())),
-        "trim_end" => Ok(Value::String(string_val.trim_end().to_string())),
+        "upper" => {
+            let string_val = extract_string_value(value)?;
+            Ok(Value::String(string_val.to_uppercase()))
+        },
+        "lower" => {
+            let string_val = extract_string_value(value)?;
+            Ok(Value::String(string_val.to_lowercase()))
+        },
+        "trim" => {
+            let string_val = extract_string_value(value)?;
+            Ok(Value::String(string_val.trim().to_string()))
+        },
+        "trim_start" => {
+            let string_val = extract_string_value(value)?;
+            Ok(Value::String(string_val.trim_start().to_string()))
+        },
+        "trim_end" => {
+            let string_val = extract_string_value(value)?;
+            Ok(Value::String(string_val.trim_end().to_string()))
+        },
+        "length" => {
+            let string_val = extract_string_value(value)?;
+            Ok(Value::Number(serde_json::Number::from(string_val.chars().count())))
+        },
+        "reverse" => {
+            let string_val = extract_string_value(value)?;
+            Ok(Value::String(string_val.chars().rev().collect()))
+        },
         op if op.starts_with("contains(") && op.ends_with(")") => {
+            let string_val = extract_string_value(value)?;
             let pattern = extract_string_argument(op)?;
             Ok(Value::Bool(string_val.contains(&pattern)))
         },
         op if op.starts_with("starts_with(") && op.ends_with(")") => {
+            let string_val = extract_string_value(value)?;
             let pattern = extract_string_argument(op)?;
             Ok(Value::Bool(string_val.starts_with(&pattern)))
         },
         op if op.starts_with("ends_with(") && op.ends_with(")") => {
+            let string_val = extract_string_value(value)?;
             let pattern = extract_string_argument(op)?;
             Ok(Value::Bool(string_val.ends_with(&pattern)))
         },
         op if op.starts_with("replace(") && op.ends_with(")") => {
+            let string_val = extract_string_value(value)?;
             let (old, new) = extract_replace_arguments(op)?;
             Ok(Value::String(string_val.replace(&old, &new)))
         },
         op if op.starts_with("substring(") && op.ends_with(")") => {
+            let string_val = extract_string_value(value)?;
             let (start, length) = extract_substring_arguments(op)?;
             let result = extract_substring(string_val, start, length)?;
             Ok(Value::String(result))
         },
+        op if op.starts_with("split(") && op.ends_with(")") => {
+            let string_val = extract_string_value(value)?;
+            let delimiter = extract_string_argument(op)?;
+            let parts: Vec<Value> = string_val
+                .split(&delimiter)
+                .map(|s| Value::String(s.to_string()))
+                .collect();
+            Ok(Value::Array(parts))
+        },
+        op if op.starts_with("join(") && op.ends_with(")") => {
+            // join操作は配列に対して適用
+            apply_join_operation(value, op)
+        },
         _ => Err(Error::StringOperation(format!("Unknown string operation: {}", operation))),
+    }
+}
+
+/// 文字列値を抽出（エラーハンドリングを統一）
+fn extract_string_value(value: &Value) -> Result<&str, Error> {
+    match value {
+        Value::String(s) => Ok(s),
+        _ => Err(Error::StringOperation(
+            format!("String operations can only be applied to string values, got: {}", get_type_name(value))
+        )),
+    }
+}
+
+/// join操作を配列に適用
+fn apply_join_operation(value: &Value, operation: &str) -> Result<Value, Error> {
+    if let Value::Array(arr) = value {
+        let delimiter = extract_string_argument(operation)?;
+        
+        let string_parts: Result<Vec<String>, Error> = arr
+            .iter()
+            .map(|v| match v {
+                Value::String(s) => Ok(s.clone()),
+                Value::Number(n) => Ok(n.to_string()),
+                Value::Bool(b) => Ok(b.to_string()),
+                Value::Null => Ok("null".to_string()),
+                _ => Err(Error::StringOperation("Cannot join non-primitive values".to_string())),
+            })
+            .collect();
+        
+        let parts = string_parts?;
+        Ok(Value::String(parts.join(&delimiter)))
+    } else {
+        Err(Error::StringOperation("join can only be applied to arrays".to_string()))
+    }
+}
+
+/// 値の型名を取得
+fn get_type_name(value: &Value) -> &'static str {
+    match value {
+        Value::String(_) => "string",
+        Value::Number(_) => "number",
+        Value::Bool(_) => "boolean",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+        Value::Null => "null",
     }
 }
 
@@ -179,6 +257,14 @@ mod tests {
         let padded = Value::String("  hello  ".to_string());
         let result = apply_string_operation(&padded, "trim").unwrap();
         assert_eq!(result, Value::String("hello".to_string()));
+        
+        // length
+        let result = apply_string_operation(&value, "length").unwrap();
+        assert_eq!(result, Value::Number(11.into()));
+        
+        // reverse
+        let result = apply_string_operation(&value, "reverse").unwrap();
+        assert_eq!(result, Value::String("dlroW olleH".to_string()));
     }
 
     #[test]
@@ -220,6 +306,33 @@ mod tests {
         // substring without length (to end)
         let result = apply_string_operation(&value, "substring(6)").unwrap();
         assert_eq!(result, Value::String("World".to_string()));
+    }
+
+    #[test]
+    fn test_split_operation() {
+        let value = Value::String("apple,banana,cherry".to_string());
+        
+        let result = apply_string_operation(&value, r#"split(",")"#).unwrap();
+        if let Value::Array(arr) = result {
+            assert_eq!(arr.len(), 3);
+            assert_eq!(arr[0], Value::String("apple".to_string()));
+            assert_eq!(arr[1], Value::String("banana".to_string()));
+            assert_eq!(arr[2], Value::String("cherry".to_string()));
+        } else {
+            panic!("Expected array result");
+        }
+    }
+
+    #[test]
+    fn test_join_operation() {
+        let value = Value::Array(vec![
+            Value::String("apple".to_string()),
+            Value::String("banana".to_string()),
+            Value::String("cherry".to_string()),
+        ]);
+        
+        let result = apply_string_operation(&value, r#"join(", ")"#).unwrap();
+        assert_eq!(result, Value::String("apple, banana, cherry".to_string()));
     }
 
     #[test]
