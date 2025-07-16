@@ -274,7 +274,7 @@ fn print_as_json(data: &[Value], use_colors: bool) -> Result<(), Error> {
     if use_colors {
         print_colored_json_simple(data)?;
     } else {
-        let json = serde_json::to_string_pretty(data).map_err(|e| Error::Json(e))?;
+        let json = serde_json::to_string_pretty(data).map_err(Error::Json)?;
         println!("{}", json);
     }
     
@@ -286,7 +286,7 @@ fn print_colored_json_simple(data: &[Value]) -> Result<(), Error> {
     let colors = ColorScheme::new();
     
     // シンプルなアプローチ：行ごとに処理
-    let json = serde_json::to_string_pretty(data).map_err(|e| Error::Json(e))?;
+    let json = serde_json::to_string_pretty(data).map_err(Error::Json)?;
     
     for line in json.lines() {
         let trimmed = line.trim();
@@ -533,7 +533,7 @@ fn print_colored_data_info(data: &[Value]) -> Result<(), Error> {
                     stdout.reset()?;
                     println!(" [{} items]", arr.len());
                     
-                    if let Some(first_elem) = arr.get(0) {
+                    if let Some(first_elem) = arr.first() {
                         if let Value::Object(elem_obj) = first_elem {
                             print!("    └─ ");
                             let sub_fields: Vec<&String> = elem_obj.keys().collect();
@@ -588,7 +588,7 @@ fn print_plain_data_info(data: &[Value]) {
             for (key, value) in obj {
                 if let Value::Array(arr) = value {
                     println!("  {:<15} [{} items]", key, arr.len());
-                    if let Some(first_elem) = arr.get(0) {
+                    if let Some(first_elem) = arr.first() {
                         if let Value::Object(elem_obj) = first_elem {
                             print!("    └─ ");
                             let sub_fields: Vec<&String> = elem_obj.keys().collect();

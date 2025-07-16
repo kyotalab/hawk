@@ -23,7 +23,7 @@ pub fn execute_query(json: &Value, query: &str, format: OutputFormat) -> Result<
         // 残りのパイプライン操作を順次実行
         // Execute the remaining pipeline operations sequentially.
         for operation in &parts[1..] {
-            current_data = apply_pipeline_operation(current_data, &operation)?;
+            current_data = apply_pipeline_operation(current_data, operation)?;
         }
 
         // 最終結果の出力
@@ -54,7 +54,7 @@ pub fn execute_basic_query(json: &Value, query: &str) -> Result<Vec<String>, Err
             let result = handle_array_access(json, key, fields)?;
             Ok(result)
         } else {
-            let index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
+            let index = index_str.parse::<usize>().map_err(Error::StrToInt)?;
             let result = handle_single_access(json, key, index, fields)?;
             Ok(result)
         }
@@ -110,7 +110,7 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
                 // 数値インデックスのみ
                 let index = bracket_content
                     .parse::<usize>()
-                    .map_err(|e| Error::StrToInt(e))?;
+                    .map_err(Error::StrToInt)?;
 
                 if let Value::Array(arr) = json {
                     let item = arr.get(index).ok_or(Error::IndexOutOfBounds(index))?;
@@ -144,7 +144,7 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
         } else {
             let index = bracket_content
                 .parse::<usize>()
-                .map_err(|e| Error::StrToInt(e))?;
+                .map_err(Error::StrToInt)?;
 
             // **修正: 結果が配列の場合は展開**
             let result = handle_single_access_as_json(json, key, index, fields)?;
@@ -214,14 +214,14 @@ pub fn handle_nested_field_access(json: &Value, fields: Vec<&str>) -> Result<Vec
                     }
                 } else {
                     Err(Error::InvalidQuery(
-                        format!("Cannot iterate over non-array field '{}'", key).into(),
+                        format!("Cannot iterate over non-array field '{}'", key),
                     ))
                 }
             } else {
                 //                 // 数値インデックス [0] → 特定要素にアクセス
                 let index = bracket_content.parse::<usize>().map_err(|e| {
                     Error::InvalidQuery(
-                        format!("Invalid array index '{}': {}", bracket_content, e).into(),
+                        format!("Invalid array index '{}': {}", bracket_content, e),
                     )
                 })?;
 
@@ -237,13 +237,13 @@ pub fn handle_nested_field_access(json: &Value, fields: Vec<&str>) -> Result<Vec
                     }
                 } else {
                     Err(Error::InvalidQuery(
-                        format!("Cannot index non-array field '{}'", key).into(),
+                        format!("Cannot index non-array field '{}'", key),
                     ))
                 }
             }
         } else {
             Err(Error::InvalidQuery(
-                format!("Field '{}' not found", key).into(),
+                format!("Field '{}' not found", key),
             ))
         }
     } else {
@@ -259,7 +259,7 @@ pub fn handle_nested_field_access(json: &Value, fields: Vec<&str>) -> Result<Vec
             }
         } else {
             Err(Error::InvalidQuery(
-                format!("Field '{}' not found", field).into(),
+                format!("Field '{}' not found", field),
             ))
         }
     }
@@ -333,12 +333,12 @@ pub fn handle_single_access_as_json(
                     }
                 } else {
                     return Err(Error::InvalidQuery(
-                        format!("Field '{}' is not an array", field_key).into(),
+                        format!("Field '{}' is not an array", field_key),
                     ));
                 }
             } else {
                 // 数値インデックスの場合
-                let field_index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
+                let field_index = index_str.parse::<usize>().map_err(Error::StrToInt)?;
                 current = array
                     .get(field_index)
                     .ok_or(Error::IndexOutOfBounds(field_index))?;
@@ -437,7 +437,7 @@ pub fn handle_single_access(
             let index_str = field
                 .get(idx + 1..ridx)
                 .ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
-            let field_index = index_str.parse::<usize>().map_err(|e| Error::StrToInt(e))?;
+            let field_index = index_str.parse::<usize>().map_err(Error::StrToInt)?;
 
             // field_key でアクセスしてから、field_index でアクセス
             // Access with field_key, then access with field_index
@@ -526,7 +526,7 @@ fn split_pipeline_respecting_parentheses(query: &str) -> Result<Vec<String>, Err
     let mut paren_depth = 0;
     let mut chars = query.chars().peekable();
     
-    while let Some(ch) = chars.next() {
+    for ch in chars {
         match ch {
             '(' => {
                 paren_depth += 1;

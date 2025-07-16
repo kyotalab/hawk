@@ -30,7 +30,7 @@ fn apply_filter_with_string_operations(data: Vec<Value>, condition: &str) -> Res
     }
     
     let field_access = parts[0];
-    let string_operations: Vec<&str> = parts[1..].iter().cloned().collect();
+    let string_operations: Vec<&str> = parts[1..].to_vec();
     
     // 最後の操作は比較操作である必要がある
     let last_operation = string_operations.last().ok_or_else(|| {
@@ -409,7 +409,7 @@ fn group_data_by_field(data: Vec<Value>, field_name: &str) -> Result<Vec<Value>,
     for item in data {
         if let Some(field_value) = item.get(field_name) {
             let key = value_to_string(field_value);
-            groups.entry(key).or_insert_with(Vec::new).push(item);
+            groups.entry(key).or_default().push(item);
         }
     }
 

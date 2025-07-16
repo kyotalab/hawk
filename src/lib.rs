@@ -35,7 +35,7 @@ pub fn debug_json_order(json: &Value) {
         // users配列の最初の要素のフィールド順序
         // Field order of the first element in the users array
         if let Some(Value::Array(users)) = obj.get("users") {
-            if let Some(Value::Object(first_user)) = users.get(0) {
+            if let Some(Value::Object(first_user)) = users.first() {
                 println!("First user fields:");
                 for key in first_user.keys() {
                     println!("  {}", key);

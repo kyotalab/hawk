@@ -23,7 +23,7 @@ pub fn parse_query_segments(query: &str) -> Result<(&str, Vec<&str>), Error> {
         let mut segments = remaining.split('.');
         let first_segment = segments.next().unwrap();
         let rest: Vec<&str> = segments.collect();
-        let result = Ok(("", vec![vec![first_segment], rest].concat()));
+        let result = Ok(("", [vec![first_segment], rest].concat()));
         // println!("Root array access result: {:?}", result);
         return result;
     }
@@ -34,9 +34,9 @@ pub fn parse_query_segments(query: &str) -> Result<(&str, Vec<&str>), Error> {
         .ok_or(Error::InvalidQuery("Missing field segment in query".into()))?;
     let fields: Vec<&str> = segments.collect();
 
-    let result = Ok((segment, fields));
+    
     // println!("Normal parse result: {:?}", result);
-    result
+    Ok((segment, fields))
 }
 
 pub fn parse_array_segment(segment: &str) -> Result<(usize, usize), Error> {

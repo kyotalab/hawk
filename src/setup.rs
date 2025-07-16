@@ -230,7 +230,7 @@ fn parse_csv_to_json(content: &str) -> Result<Value, Error> {
     // ヘッダーを取得
     let headers: Vec<String> = reader
         .headers()
-        .map_err(|e| Error::Csv(e))?
+        .map_err(Error::Csv)?
         .iter()
         .map(|h| h.trim().to_string())
         .collect();
@@ -238,7 +238,7 @@ fn parse_csv_to_json(content: &str) -> Result<Value, Error> {
     let mut records = Vec::new();
 
     for result in reader.records() {
-        let record = result.map_err(|e| Error::Csv(e))?;
+        let record = result.map_err(Error::Csv)?;
         let mut object = serde_json::Map::new();
 
         for (i, field) in record.iter().enumerate() {
