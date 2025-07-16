@@ -237,6 +237,68 @@ pub fn apply_string_pipeline(value: &Value, operations: &[&str]) -> Result<Value
     Ok(current_value)
 }
 
+/// 複数フィールドに対して同じ操作を適用（ケース1）
+pub fn apply_operation_to_multiple_fields(item: &Value, field_paths: &[&str], operation: &str) -> Result<Value, Error> {
+    let mut updated_item = item.clone();
+    
+    // 各フィールドに同じ操作を適用
+    for field_path in field_paths {
+        // フィールド値を取得
+        let field_value = extract_field_value_from_item(item, field_path)?;
+        
+        // 操作を適用
+        let transformed_value = apply_string_operation(&field_value, operation)?;
+        
+        // フィールドを更新
+        updated_item = update_field_in_item(updated_item, field_path, transformed_value)?;
+    }
+    
+    Ok(updated_item)
+}
+
+/// アイテムからフィールド値を抽出
+fn extract_field_value_from_item(item: &Value, field_path: &str) -> Result<Value, Error> {
+    if field_path == "." {
+        return Ok(item.clone());
+    }
+    
+    if !field_path.starts_with('.') {
+        return Err(Error::StringOperation(format!("Field path must start with '.': {}", field_path)));
+    }
+    
+    let field_name = &field_path[1..]; // '.' を除去
+    
+    if let Some(value) = item.get(field_name) {
+        Ok(value.clone())
+    } else {
+        Err(Error::StringOperation(format!("Field '{}' not found", field_name)))
+    }
+}
+
+/// アイテムのフィールドを更新
+fn update_field_in_item(item: Value, field_path: &str, new_value: Value) -> Result<Value, Error> {
+    if field_path == "." {
+        // ルート値の場合は直接置き換え
+        return Ok(new_value);
+    }
+    
+    if !field_path.starts_with('.') {
+        return Err(Error::StringOperation(format!("Field path must start with '.': {}", field_path)));
+    }
+    
+    let field_name = &field_path[1..]; // '.' を除去
+    
+    if let Value::Object(mut obj) = item {
+        obj.insert(field_name.to_string(), new_value);
+        Ok(Value::Object(obj))
+    } else {
+        // オブジェクトでない場合は新しいオブジェクトを作成
+        let mut new_obj = serde_json::Map::new();
+        new_obj.insert(field_name.to_string(), new_value);
+        Ok(Value::Object(new_obj))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

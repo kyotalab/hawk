@@ -16,7 +16,7 @@ pub fn setup() -> Result<(Value, String, OutputFormat), Error> {
         buffer
     };
 
-    let input_format = if let Some(_exists) = args.text {
+    let input_format = if args.text {
         InputFormat::Text
     } else {
         detect_input_format(&content)

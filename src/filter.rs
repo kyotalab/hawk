@@ -282,9 +282,21 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
 
 /// map操作の実装
 fn apply_map_operation(data: Vec<Value>, operation: &str) -> Result<Vec<Value>, Error> {
-    // "map(.field | string_operation)" の解析
+    // "map(.field | string_operation)" または "map(.field1, .field2 | operation)" の解析
     let content = &operation[4..operation.len() - 1]; // "map(" と ")" を除去
     
+    // **新機能: 複数フィールド対応**
+    if content.contains(',') && content.contains('|') {
+        // 複数フィールドの場合: "map(.skills, .projects | join(\",\"))"
+        apply_multi_field_map_operation(data, content)
+    } else {
+        // 単一フィールドの場合: "map(.field | operation)"
+        apply_single_field_map_operation(data, content)
+    }
+}
+
+/// 単一フィールドのmap操作（既存）
+fn apply_single_field_map_operation(data: Vec<Value>, content: &str) -> Result<Vec<Value>, Error> {
     let (field_access, string_operations) = parse_map_content(content)?;
     
     let mut results = Vec::new();
@@ -299,6 +311,42 @@ fn apply_map_operation(data: Vec<Value>, operation: &str) -> Result<Vec<Value>, 
         // 元のオブジェクトを更新または新しい値を作成
         let result = update_or_create_value(&item, &field_access, transformed_value)?;
         results.push(result);
+    }
+    
+    Ok(results)
+}
+
+/// 複数フィールドのmap操作（ケース1: 各フィールドに同じ操作）
+fn apply_multi_field_map_operation(data: Vec<Value>, content: &str) -> Result<Vec<Value>, Error> {
+    // "(.skills, .projects | join(\",\"))" を解析
+    let parts: Vec<&str> = content.split('|').map(|s| s.trim()).collect();
+    
+    if parts.len() != 2 {
+        return Err(Error::InvalidQuery("Multi-field map must have format: (.field1, .field2 | operation)".to_string()));
+    }
+    
+    let fields_part = parts[0].trim();
+    let operation = parts[1].trim();
+    
+    // フィールド部分をパース: ".skills, .projects"
+    let field_paths: Vec<&str> = fields_part
+        .split(',')
+        .map(|s| s.trim())
+        .collect();
+    
+    // 各フィールドパスが "." で始まることを確認
+    for field_path in &field_paths {
+        if !field_path.starts_with('.') {
+            return Err(Error::InvalidQuery(format!("Field path must start with '.': {}", field_path)));
+        }
+    }
+    
+    let mut results = Vec::new();
+    
+    for item in data {
+        // 各フィールドに同じ操作を適用（ケース1）
+        let transformed_item = crate::string_ops::apply_operation_to_multiple_fields(&item, &field_paths, operation)?;
+        results.push(transformed_item);
     }
     
     Ok(results)

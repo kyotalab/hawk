@@ -136,9 +136,9 @@ pub struct Args {
     #[arg(value_parser = ["auto", "table", "json", "list"])]
     pub format: String,
 
-    #[arg(long, short, action = clap::ArgAction::SetFalse)]
+    #[arg(long, short)]
     #[arg(help = "Force text format (skip auto-detection)")]
-    pub text: Option<bool>
+    pub text: bool,
 }
 
 #[derive(Debug, Clone)]
