@@ -10,7 +10,7 @@ use crate::Error;
 /// Perfect for analyzing JSON APIs, YAML configs, and CSV datasets.
 #[derive(Debug, Parser)]
 #[command(name = "hawk")]
-#[command(version = "0.2.1")]
+#[command(version = "0.2.2")]
 #[command(about = "Modern data analysis tool for structured data and text files")]
 #[command(long_about = "
 hawk is a command-line data analysis tool that brings pandas-like functionality
