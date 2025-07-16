@@ -524,7 +524,7 @@ fn split_pipeline_respecting_parentheses(query: &str) -> Result<Vec<String>, Err
     let mut parts = Vec::new();
     let mut current_part = String::new();
     let mut paren_depth = 0;
-    let mut chars = query.chars().peekable();
+    let chars = query.chars().peekable();
     
     for ch in chars {
         match ch {
