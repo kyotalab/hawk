@@ -455,52 +455,52 @@ hawk '.query' --format json  # Specify output format
 
 ### Query Language Reference
 
-| Operation               | Syntax              | Example                         |
-| ----------------------- | ------------------- | ------------------------------- |
-| Field access            | `.field`            | `.name`                         |
-| Array index             | `.array[0]`         | `.users[0]`                     |
-| Array iteration         | `.array[]`          | `.users[]`                      |
-| Multi-level arrays      | `.array[].nested[]` | `.Reservations[].Instances[]`   |
-| **Text processing**     | `. \| map(. \| operation)`         | `. \| map(. \| upper)`             |
+| Operation               | Syntax                                | Example                               |
+| ----------------------- | ------------------------------------- | ------------------------------------- |
+| Field access            | `.field`                              | `.name`                               |
+| Array index             | `.array[0]`                           | `.users[0]`                           |
+| Array iteration         | `.array[]`                            | `.users[]`                            |
+| Multi-level arrays      | `.array[].nested[]`                   | `.Reservations[].Instances[]`         |
+| **Text processing**     | `. \| map(. \| operation)`            | `. \| map(. \| upper)`                |
 | **String filtering**    | `. \| select(. \| contains("text"))`  | `. \| select(. \| contains("ERROR"))` |
-| **String manipulation** | `. \| map(. \| replace("a", "b"))` | `. \| map(. \| trim)`              |
-| Field selection         | `  \| select_fields(field1,field2)`   |  `\| select_fields(name,age)`          |
-| Filtering               | `  \| select(.field > value)`         |  `\| select(.age > 30)`                |
-| Nested filtering        | `  \| select(.nested.field == value)` |  `\| select(.State.Name == "running")` |
-| Grouping                | `  \| group_by(.field)`               |   `\| group_by(.department)`            |
-| Counting                | `  \| count`         | `.users \| count`           |
-| Aggregation             | `  \| sum/avg/min/max(.field)`        |   `\| avg(.salary)`    |
-| **Statistics**          | `  \| median/stddev/unique/sort`      |   `\| median`          |
-| Info                    | `  \| info`                           | `. \| info`                             |
+| **String manipulation** | `. \| map(. \| replace("a", "b"))`    | `. \| map(. \| trim)`                 |
+| Field selection         | `  \| select_fields(field1,field2)`   | `\| select_fields(name,age)`          |
+| Filtering               | `  \| select(.field > value)`         | `\| select(.age > 30)`                |
+| Nested filtering        | `  \| select(.nested.field == value)` | `\| select(.State.Name == "running")` |
+| Grouping                | `  \| group_by(.field)`               | `\| group_by(.department)`            |
+| Counting                | `  \| count`                          | `.users \| count`                     |
+| Aggregation             | `  \| sum/avg/min/max(.field)`        | `\| avg(.salary)`                     |
+| **Statistics**          | `  \| median/stddev/unique/sort`      | `\| median`                           |
+| Info                    | `  \| info`                           | `. \| info`                           |
 
 ### String Operations (NEW in v0.2.0!)
 
-| Operation               | Syntax    | Description |
-| ----------------------- | --------- | -----------
-| `upper`                 | `. \| map(. \| upper)`                            | Convert to uppercase          |
-| `lower`                 | `. \| map(. \| lower)`                            | Convert to lowercase          |
-| `trim`                  | `. \| map(. \| trim)`                             | Remove whitespace (both ends) |
-| `trim_start`            | `. \| map(. \| trim_start)`                       | Remove leading whitespace     |
-| `trim_end`              | `. \| map(. \| trim_end)`                         | Remove trailing whitespace    |
-| `length`                | `. \| map(. \| length)`                           | Get string length             |
-| `reverse`               | `. \| map(. \| reverse)`                          | Reverse string                |
-| `contains(pattern)`     | `. \| select(. \| contains("text"))`                 | Check if contains pattern     |
-| `starts_with(pattern)`  | `. \| select(. \| starts_with("pre"))`               | Check if starts with pattern  |
-| `ends_with(pattern)`    | `. \| select(. \| ends_with("suf"))`                 | Check if ends with pattern    |
-| `replace(old, new)`     | `. \| map(. \| replace("a", "b"))`                | Replace text                  |
-| `substring(start, len)` | `. \| map(. \| substring(0, 5))`                  | Extract substring             |
-| `split(delimiter)`      | `. \| map(. \| split(","))`                       | Split by delimiter            |
-| `join(delimiter)`       | `.array[] \| join(", ")` | Join array elements with delimiter |
+| Operation               | Syntax                                 | Description                        |
+| ----------------------- | -------------------------------------- | ---------------------------------- |
+| `upper`                 | `. \| map(. \| upper)`                 | Convert to uppercase               |
+| `lower`                 | `. \| map(. \| lower)`                 | Convert to lowercase               |
+| `trim`                  | `. \| map(. \| trim)`                  | Remove whitespace (both ends)      |
+| `trim_start`            | `. \| map(. \| trim_start)`            | Remove leading whitespace          |
+| `trim_end`              | `. \| map(. \| trim_end)`              | Remove trailing whitespace         |
+| `length`                | `. \| map(. \| length)`                | Get string length                  |
+| `reverse`               | `. \| map(. \| reverse)`               | Reverse string                     |
+| `contains(pattern)`     | `. \| select(. \| contains("text"))`   | Check if contains pattern          |
+| `starts_with(pattern)`  | `. \| select(. \| starts_with("pre"))` | Check if starts with pattern       |
+| `ends_with(pattern)`    | `. \| select(. \| ends_with("suf"))`   | Check if ends with pattern         |
+| `replace(old, new)`     | `. \| map(. \| replace("a", "b"))`     | Replace text                       |
+| `substring(start, len)` | `. \| map(. \| substring(0, 5))`       | Extract substring                  |
+| `split(delimiter)`      | `. \| map(. \| split(","))`            | Split by delimiter                 |
+| `join(delimiter)`       | `.array[] \| join(", ")`               | Join array elements with delimiter |
 
 ### Statistical Operations (NEW in v0.2.0!)
 
-| Operation | Syntax | Description |
-| --------- | ------ | ----------- |
-| `unique`  | `. \| unique`     | Remove duplicates            |
-| `sort`    | `. \| sort`       | Sort values                  |
-| `median`  | `. \| median`     | Calculate median             |
-| `stddev`  | `. \| stddev`     | Calculate standard deviation |
-| `length`  | `. \| length`     | Get array length             |
+| Operation | Syntax        | Description                  |
+| --------- | ------------- | ---------------------------- |
+| `unique`  | `. \| unique` | Remove duplicates            |
+| `sort`    | `. \| sort`   | Sort values                  |
+| `median`  | `. \| median` | Calculate median             |
+| `stddev`  | `. \| stddev` | Calculate standard deviation |
+| `length`  | `. \| length` | Get array length             |
 
 ### Supported Operators
 
