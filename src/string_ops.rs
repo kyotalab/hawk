@@ -58,6 +58,10 @@ pub fn apply_string_operation(value: &Value, operation: &str) -> Result<Value, E
             let result = extract_substring(string_val, start, length)?;
             Ok(Value::String(result))
         },
+        op if op.starts_with("split(") && op.contains(")[") => {
+            // **新機能: split(...)[index] 形式の処理**
+            apply_split_with_index(value, op)
+        },
         op if op.starts_with("split(") && op.ends_with(")") => {
             let string_val = extract_string_value(value)?;
             let delimiter = extract_string_argument(op)?;
@@ -72,6 +76,43 @@ pub fn apply_string_operation(value: &Value, operation: &str) -> Result<Value, E
             apply_join_operation(value, op)
         },
         _ => Err(Error::StringOperation(format!("Unknown string operation: {}", operation))),
+    }
+}
+
+/// split(...)[index] 形式の処理
+fn apply_split_with_index(value: &Value, operation: &str) -> Result<Value, Error> {
+    // "split(\" \")[0]" のような形式を解析
+    let split_end = operation.find(")[").ok_or_else(|| {
+        Error::StringOperation("Invalid split with index format".to_string())
+    })?;
+    
+    let bracket_start = split_end + 2; // ")[" の後
+    let bracket_end = operation.len() - 1; // 最後の ']'
+    
+    if !operation.ends_with(']') {
+        return Err(Error::StringOperation("Missing closing bracket in split index".to_string()));
+    }
+    
+    // split部分とindex部分を分離
+    let split_part = &operation[..split_end + 1]; // "split(\" \")"
+    let index_part = &operation[bracket_start..bracket_end]; // "0"
+    
+    // まずsplitを実行
+    let string_val = extract_string_value(value)?;
+    let delimiter = extract_string_argument(split_part)?;
+    let parts: Vec<&str> = string_val.split(&delimiter).collect();
+    
+    // インデックスを解析
+    let index = index_part.parse::<usize>().map_err(|_| {
+        Error::StringOperation(format!("Invalid array index: {}", index_part))
+    })?;
+    
+    // インデックスでアクセス
+    if let Some(part) = parts.get(index) {
+        Ok(Value::String(part.to_string()))
+    } else {
+        // インデックスが範囲外の場合は空文字列を返す（配列の動作に合わせる）
+        Ok(Value::String("".to_string()))
     }
 }
 
