@@ -10,7 +10,7 @@ use crate::Error;
 /// Perfect for analyzing JSON APIs, YAML configs, and CSV datasets.
 #[derive(Debug, Parser)]
 #[command(name = "hawk")]
-#[command(version = "0.2.0")]
+#[command(version = "0.2.1")]
 #[command(about = "Modern data analysis tool for structured data and text files")]
 #[command(long_about = "
 hawk is a command-line data analysis tool that brings pandas-like functionality
@@ -111,9 +111,9 @@ pub struct Args {
     /// Examples:
     ///
     ///   .users[0].name              - Get first user's name
-    ///   
+    ///
     ///   .users | select(.age > 30)  - Filter users by age
-    ///   
+    ///
     ///   . | group_by(.department)   - Group by department
     pub query: String,
 
@@ -128,9 +128,9 @@ pub struct Args {
     ///    auto: Smart detection (table for arrays, list for values, json for complex)
     ///
     ///    table: Force tabular output
-    /// 
+    ///
     ///    json: Force JSON output
-    /// 
+    ///
     ///    list: Force list output
     #[arg(long, default_value = "auto")]
     #[arg(value_parser = ["auto", "table", "json", "list"])]
