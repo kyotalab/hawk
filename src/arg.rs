@@ -125,13 +125,13 @@ pub struct Args {
 
     /// Output format
     ///
-    ///     auto: Smart detection (table for arrays, list for values, json for complex)
+    ///    auto: Smart detection (table for arrays, list for values, json for complex)
     ///
-    ///     table: Force tabular output
+    ///    table: Force tabular output
     /// 
-    ///     json: Force JSON output
+    ///    json: Force JSON output
     /// 
-    ///     list: Force list output
+    ///    list: Force list output
     #[arg(long, default_value = "auto")]
     #[arg(value_parser = ["auto", "table", "json", "list"])]
     pub format: String,

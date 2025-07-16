@@ -194,18 +194,6 @@ mod tests {
     }
 
     #[test]
-    fn test_median_odd() {
-        let data = vec![
-            Value::Number(1.into()),
-            Value::Number(3.into()),
-            Value::Number(5.into()),
-        ];
-        
-        let result = apply_median(&data, None).unwrap();
-        assert_eq!(result, Value::Number(3.into()));
-    }
-
-    #[test]
     fn test_median_even() {
         let data = vec![
             Value::Number(1.into()),

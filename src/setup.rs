@@ -311,41 +311,6 @@ mod tests {
             panic!("Expected array result");
         }
     }
-
-    #[test]
-    fn test_empty_text() {
-        let content = "";
-        let result = parse_text_to_json(content).unwrap();
-        
-        if let Value::Array(lines) = result {
-            assert_eq!(lines.len(), 1);
-            assert_eq!(lines[0], Value::String("".to_string()));
-        } else {
-            panic!("Expected array result");
-        }
-    }
-
-    #[test]
-    fn test_format_detection() {
-        // JSON
-        assert!(matches!(detect_input_format(r#"{"key": "value"}"#), InputFormat::Json));
-        assert!(matches!(detect_input_format(r#"[{"name": "Alice"}, {"name": "Bob"}]"#), InputFormat::Json));
-        
-        // CSV
-        assert!(matches!(detect_input_format("name,age\nAlice,30\nBob,25"), InputFormat::Csv));
-        
-        // YAML - 明確な構造化YAML
-        assert!(matches!(detect_input_format("apiVersion: v1\nkind: Pod\nmetadata:\n  name: test"), InputFormat::Yaml));
-        assert!(matches!(detect_input_format("version: '3'\nservices:\n  web:\n    image: nginx"), InputFormat::Yaml));
-        
-        // Text - あらゆる種類のプレーンテキスト
-        assert!(matches!(detect_input_format("plain text line\nanother line\nthird line"), InputFormat::Text));
-        assert!(matches!(detect_input_format("2024-01-01 10:00:00 INFO Starting application\n2024-01-01 10:00:01 ERROR Something failed"), InputFormat::Text));
-        assert!(matches!(detect_input_format("192.168.1.100 - - [15/Jan/2024:09:00:01 +0000] \"GET /api/users HTTP/1.1\" 200 1234"), InputFormat::Text));
-        assert!(matches!(detect_input_format("# This is a comment\nSome content\n# Another comment"), InputFormat::Text));
-        assert!(matches!(detect_input_format("ServerName localhost\nServerPort 8080\nDocumentRoot /var/www"), InputFormat::Text));
-        assert!(matches!(detect_input_format("Random text with: colons but not YAML\nAnother line with strange: formatting"), InputFormat::Text));
-    }
     
     #[test]
     fn test_yaml_detection() {

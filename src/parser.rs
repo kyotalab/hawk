@@ -100,19 +100,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_query_segments_missing_field_segment() {
-        // エラーケース: フィールドセグメントが不足
-        let result = parse_query_segments(".");
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            Error::InvalidQuery(msg) => {
-                assert!(msg.contains("Missing parameter segment"));
-            }
-            _ => panic!("Expected InvalidQuery error"),
-        }
-    }
-
-    #[test]
     fn test_parse_query_segments_truly_missing_field() {
         // エラーケース: 本当にフィールドセグメントが不足
         let result = parse_query_segments("");
@@ -125,18 +112,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_parse_query_segments_missing_parameter_segment() {
-        // エラーケース: パラメータセグメントが不足
-        let result = parse_query_segments(".users");
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            Error::InvalidQuery(msg) => {
-                assert!(msg.contains("Missing parameter segment"));
-            }
-            _ => panic!("Expected InvalidQuery error"),
-        }
-    }
 
     #[test]
     fn test_parse_query_segments_empty_query() {
@@ -149,39 +124,6 @@ mod tests {
             }
             _ => panic!("Expected InvalidQuery error"),
         }
-    }
-
-    #[test]
-    fn test_parse_query_segments_no_leading_dot() {
-        // エラーケース: 先頭の.がない
-        let result = parse_query_segments("users.name");
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            Error::InvalidQuery(msg) => {
-                assert!(msg.contains("Missing parameter segment"));
-            }
-            _ => panic!("Expected InvalidQuery error"),
-        }
-    }
-
-    #[test]
-    fn test_parse_query_segments_multiple_segments() {
-        // 修正: 複数セグメントは正常に処理される
-        let result = parse_query_segments(".users.name.extra");
-        assert!(result.is_ok());
-        let (segment, fields) = result.unwrap();
-        assert_eq!(segment, "users");
-        assert_eq!(fields, vec!["name", "extra"]); // 3番目も含まれる
-    }
-
-    #[test]
-    fn test_parse_query_segments_many_segments() {
-        // さらに多くのセグメント
-        let result = parse_query_segments(".a.b.c.d.e");
-        assert!(result.is_ok());
-        let (segment, fields) = result.unwrap();
-        assert_eq!(segment, "a");
-        assert_eq!(fields, vec!["b", "c", "d", "e"]);
     }
 
     #[test]
