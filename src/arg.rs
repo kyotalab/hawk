@@ -135,6 +135,10 @@ pub struct Args {
     #[arg(long, default_value = "auto")]
     #[arg(value_parser = ["auto", "table", "json", "list"])]
     pub format: String,
+
+    #[arg(long, short, action = clap::ArgAction::SetFalse)]
+    #[arg(help = "Force text format (skip auto-detection)")]
+    pub text: Option<bool>
 }
 
 #[derive(Debug, Clone)]

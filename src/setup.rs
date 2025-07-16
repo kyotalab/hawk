@@ -16,7 +16,11 @@ pub fn setup() -> Result<(Value, String, OutputFormat), Error> {
         buffer
     };
 
-    let input_format = detect_input_format(&content);
+    let input_format = if let Some(_exists) = args.text {
+        InputFormat::Text
+    } else {
+        detect_input_format(&content)
+    };
 
     let data = parse_content(&content, input_format)?;
     let query = args.query;
