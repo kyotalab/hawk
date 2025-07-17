@@ -480,6 +480,18 @@ fn parse_condition(condition: &str) -> Result<(String, String, String), Error> {
     let condition = condition.trim();
 
     // 演算子を検出
+    if let Some(pos) = condition.find(" >= ") {
+        let field = condition[..pos].trim().to_string();
+        let value = condition[pos + 4..].trim().to_string();
+        return Ok((field, ">=".to_string(), value));
+    }
+
+    if let Some(pos) = condition.find(" <= ") {
+        let field = condition[..pos].trim().to_string();
+        let value = condition[pos + 4..].trim().to_string();
+        return Ok((field, "<=".to_string(), value));
+    }
+
     if let Some(pos) = condition.find(" > ") {
         let field = condition[..pos].trim().to_string();
         let value = condition[pos + 3..].trim().to_string();
@@ -523,6 +535,8 @@ fn evaluate_condition(item: &Value, field_path: &str, operator: &str, value: &st
     match operator {
         ">" => compare_greater(field_value, value),
         "<" => compare_less(field_value, value),
+        ">=" => !compare_greater_equal(field_value, value),
+        "<=" => compare_less_equal(field_value, value),
         "==" => compare_equal(field_value, value),
         "!=" => !compare_equal(field_value, value),
         _ => false,
@@ -574,6 +588,32 @@ fn compare_equal(field_value: &Value, target: &str) -> bool {
             "false" => !*b,
             _ => false,
         },
+        _ => false,
+    }
+}
+
+fn compare_greater_equal(field_value: &Value, target: &str) -> bool {
+    match field_value {
+        Value::Number(n) => {
+            if let Ok(target_num) = target.parse::<f64>() {
+                n.as_f64().unwrap_or(0.0) >= target_num
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
+fn compare_less_equal(field_value: &Value, target: &str) -> bool {
+    match field_value {
+        Value::Number(n) => {
+            if let Ok(target_num) = target.parse::<f64>() {
+                n.as_f64().unwrap_or(0.0) <= target_num
+            } else {
+                false
+            }
+        }
         _ => false,
     }
 }

@@ -72,28 +72,48 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
         }
     }
 
-    // **新規追加: 単一オブジェクトへの直接フィールドアクセス**
-    // .Parameters のような単純なフィールドアクセスの場合
+    // 単一オブジェクトへの直接フィールドアクセス
     if !segment.is_empty() && fields.is_empty() && !segment.contains('[') {
         if let Some(field_value) = json.get(segment) {
             return Ok(vec![field_value.clone()]);
         } else {
-            return Err(Error::InvalidQuery(format!(
-                "Field '{}' not found",
-                segment
-            )));
+            return Err(Error::InvalidQuery(format!("Field '{}' not found", segment)));
         }
     }
 
-    // ルート配列アクセス（.[0] のような場合）
+    // ルート配列アクセス（.[0] や .[0:5] のような場合）
     if segment.is_empty() && !fields.is_empty() {
         let first_field = fields[0];
 
         if first_field.starts_with('[') && first_field.ends_with(']') {
             let bracket_content = &first_field[1..first_field.len() - 1];
 
+            // **新機能: スライス記法の処理**
+            if bracket_content.contains(':') {
+                if let Value::Array(arr) = json {
+                    let (start, end) = parse_slice_notation(bracket_content)?;
+                    let sliced = apply_array_slice(arr, start, end);
+                    
+                    if fields.len() > 1 {
+                        // スライス後にさらにフィールドアクセスがある場合
+                        let remaining_fields = fields[1..].to_vec();
+                        let mut results = Vec::new();
+                        
+                        for item in sliced {
+                            if let Ok(mut item_results) = handle_nested_field_access(&item, remaining_fields.clone()) {
+                                results.append(&mut item_results);
+                            }
+                        }
+                        return Ok(results);
+                    } else {
+                        return Ok(sliced);
+                    }
+                } else {
+                    return Err(Error::InvalidQuery("Cannot slice non-array value".into()));
+                }
+            }
             // 空括弧 [] の場合は配列全体を処理
-            if bracket_content.is_empty() {
+            else if bracket_content.is_empty() {
                 if let Value::Array(arr) = json {
                     if fields.len() > 1 {
                         let remaining_fields = fields[1..].to_vec();
@@ -133,13 +153,12 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
                 }
             }
         } else {
-            // **新規追加: 単一オブジェクトのネストしたフィールドアクセス**
-            // ルートが単一オブジェクトの場合のフィールドアクセス
+            // 単一オブジェクトのネストしたフィールドアクセス
             return handle_nested_field_access(json, fields);
         }
     }
 
-    // 通常の配列アクセス（.users[0] のような場合）
+    // 通常の配列アクセス（.users[0:5] のような場合）
     if segment.contains('[') && segment.contains(']') {
         let (idx, ridx) = parse_array_segment(segment)?;
         let key = segment
@@ -149,43 +168,56 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
             .get(idx + 1..ridx)
             .ok_or(Error::InvalidQuery("Invalid bracket content".into()))?;
 
-        if bracket_content.is_empty() {
+        // **新機能: フィールド付きスライス記法の処理**
+        if bracket_content.contains(':') {
+            let field_value = json.get(key).ok_or(Error::InvalidQuery(format!("Key '{}' not found", key)))?;
+            
+            if let Value::Array(arr) = field_value {
+                let (start, end) = parse_slice_notation(bracket_content)?;
+                let sliced = apply_array_slice(arr, start, end);
+                
+                if !fields.is_empty() {
+                    // スライス後にフィールドアクセスがある場合
+                    let mut results = Vec::new();
+                    for item in sliced {
+                        if let Ok(mut item_results) = handle_nested_field_access(&item, fields.clone()) {
+                            results.append(&mut item_results);
+                        }
+                    }
+                    return Ok(results);
+                } else {
+                    return Ok(sliced);
+                }
+            } else {
+                return Err(Error::InvalidQuery(format!("Field '{}' is not an array", key)));
+            }
+        }
+        else if bracket_content.is_empty() {
             let result = handle_array_access_as_json(json, key, fields)?;
             Ok(result)
         } else {
             let index = bracket_content.parse::<usize>().map_err(Error::StrToInt)?;
 
-            // 修正: 結果が配列の場合は展開
             let result = handle_single_access_as_json(json, key, index, fields)?;
             if let Value::Array(arr) = result {
-                Ok(arr) // 配列の場合は展開
+                Ok(arr)
             } else {
-                Ok(vec![result]) // 単一値の場合はVecで包む
+                Ok(vec![result])
             }
         }
     } else {
-        // **修正: 単一オブジェクトのフィールドアクセス対応**
-        // .Parameters.VpcCidr のようなネストしたアクセス
+        // 単一オブジェクトのフィールドアクセス対応
         if !fields.is_empty() {
-            // segmentから開始してfieldsを辿る
             if let Some(first_value) = json.get(segment) {
                 return handle_nested_field_access(first_value, fields);
             } else {
-                return Err(Error::InvalidQuery(format!(
-                    "Field '{}' not found",
-                    segment
-                )));
+                return Err(Error::InvalidQuery(format!("Field '{}' not found", segment)));
             }
         } else {
-            // **修正: 単一オブジェクトの場合は配列として扱わない**
-            // 既存の handle_array_access_as_json は配列前提なので、単一オブジェクトでは使わない
             if let Some(field_value) = json.get(segment) {
                 return Ok(vec![field_value.clone()]);
             } else {
-                return Err(Error::InvalidQuery(format!(
-                    "Field '{}' not found",
-                    segment
-                )));
+                return Err(Error::InvalidQuery(format!("Field '{}' not found", segment)));
             }
         }
     }
@@ -542,6 +574,55 @@ fn split_pipeline_respecting_parentheses(query: &str) -> Result<Vec<String>, Err
 
     Ok(parts)
 }
+
+/// 配列スライス記法をパース ([start:end] 形式)
+fn parse_slice_notation(bracket_content: &str) -> Result<(Option<usize>, Option<usize>), Error> {
+    if !bracket_content.contains(':') {
+        return Err(Error::InvalidQuery("Not a slice notation".to_string()));
+    }
+    
+    let parts: Vec<&str> = bracket_content.split(':').collect();
+    if parts.len() != 2 {
+        return Err(Error::InvalidQuery("Invalid slice format, expected start:end".to_string()));
+    }
+    
+    let start = if parts[0].is_empty() {
+        None // 空の場合は先頭から
+    } else {
+        Some(parts[0].parse::<usize>().map_err(|_| {
+            Error::InvalidQuery(format!("Invalid start index: {}", parts[0]))
+        })?)
+    };
+    
+    let end = if parts[1].is_empty() {
+        None // 空の場合は末尾まで
+    } else {
+        Some(parts[1].parse::<usize>().map_err(|_| {
+            Error::InvalidQuery(format!("Invalid end index: {}", parts[1]))
+        })?)
+    };
+    
+    Ok((start, end))
+}
+
+/// 配列に対してスライス操作を適用
+fn apply_array_slice(array: &[Value], start: Option<usize>, end: Option<usize>) -> Vec<Value> {
+    let len = array.len();
+    
+    let start_idx = start.unwrap_or(0);
+    let end_idx = end.unwrap_or(len);
+    
+    // 範囲チェック
+    let start_idx = start_idx.min(len);
+    let end_idx = end_idx.min(len);
+    
+    if start_idx >= end_idx {
+        return Vec::new(); // 無効な範囲の場合は空を返す
+    }
+    
+    array[start_idx..end_idx].to_vec()
+}
+
 
 #[cfg(test)]
 mod tests {
