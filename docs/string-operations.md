@@ -218,7 +218,7 @@ hawk -t '.[1:] | map(. | split(",")[2])' data.txt  # data column
 hawk -t '. | map(. | split(" ")[1]) | unique' docker.log
 
 # Get timestamps and services
-hawk -t '. | map(. | split(" ")[0], . | split(" ")[1] | concat(" - "))' docker.log
+hawk -t '. | map(. replace("T", " ")) | map(. | split(" ")[0:2] | map(. | join("-"))' docker.log
 
 # Filter by service and extract messages
 hawk -t '. | select(. | contains("web_server")) | map(. | split(" ")[3:] | join(" "))' docker.log

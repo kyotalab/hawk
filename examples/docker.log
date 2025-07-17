@@ -1,0 +1,4 @@
+2024-01-15T10:30:45Z web_server GET /api/users 200 0.045s
+2024-01-15T10:30:46Z database_service Connected to MySQL
+2024-01-15T10:30:47Z web_server POST /api/auth 401 0.012s
+2024-01-15T10:30:48Z cache_service Redis cache miss for key:user:123

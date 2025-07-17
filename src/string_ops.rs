@@ -32,21 +32,57 @@ pub fn apply_string_operation(value: &Value, operation: &str) -> Result<Value, E
             let string_val = extract_string_value(value)?;
             Ok(Value::String(string_val.chars().rev().collect()))
         },
+        // **拡張: OR条件対応のcontains**
         op if op.starts_with("contains(") && op.ends_with(")") => {
             let string_val = extract_string_value(value)?;
             let pattern = extract_string_argument(op)?;
-            Ok(Value::Bool(string_val.contains(&pattern)))
+            
+            // パイプ区切りでOR条件をサポート
+            if pattern.contains('|') {
+                apply_contains_or_condition(&string_val, &pattern)
+            } else {
+                Ok(Value::Bool(string_val.contains(&pattern)))
+            }
         },
+        
+        // **拡張: OR条件対応のstarts_with**
         op if op.starts_with("starts_with(") && op.ends_with(")") => {
             let string_val = extract_string_value(value)?;
             let pattern = extract_string_argument(op)?;
-            Ok(Value::Bool(string_val.starts_with(&pattern)))
+            
+            if pattern.contains('|') {
+                apply_starts_with_or_condition(&string_val, &pattern)
+            } else {
+                Ok(Value::Bool(string_val.starts_with(&pattern)))
+            }
         },
+        
+        // **拡張: OR条件対応のends_with**
         op if op.starts_with("ends_with(") && op.ends_with(")") => {
             let string_val = extract_string_value(value)?;
             let pattern = extract_string_argument(op)?;
-            Ok(Value::Bool(string_val.ends_with(&pattern)))
+            
+            if pattern.contains('|') {
+                apply_ends_with_or_condition(&string_val, &pattern)
+            } else {
+                Ok(Value::Bool(string_val.ends_with(&pattern)))
+            }
         },
+        //op if op.starts_with("contains(") && op.ends_with(")") => {
+        //    let string_val = extract_string_value(value)?;
+        //    let pattern = extract_string_argument(op)?;
+        //    Ok(Value::Bool(string_val.contains(&pattern)))
+        //},
+        //op if op.starts_with("starts_with(") && op.ends_with(")") => {
+        //    let string_val = extract_string_value(value)?;
+        //    let pattern = extract_string_argument(op)?;
+        //    Ok(Value::Bool(string_val.starts_with(&pattern)))
+        //},
+        //op if op.starts_with("ends_with(") && op.ends_with(")") => {
+        //    let string_val = extract_string_value(value)?;
+        //    let pattern = extract_string_argument(op)?;
+        //    Ok(Value::Bool(string_val.ends_with(&pattern)))
+        //},
         op if op.starts_with("replace(") && op.ends_with(")") => {
             let string_val = extract_string_value(value)?;
             let (old, new) = extract_replace_arguments(op)?;
@@ -444,6 +480,27 @@ fn apply_slice_to_string_array(array: &[String], start: Option<usize>, end: Opti
     }
     
     array[start_idx..end_idx].to_vec()
+}
+
+/// contains のOR条件処理
+fn apply_contains_or_condition(text: &str, pattern: &str) -> Result<Value, Error> {
+    let patterns: Vec<&str> = pattern.split('|').map(|p| p.trim()).collect();
+    let result = patterns.iter().any(|p| text.contains(p));
+    Ok(Value::Bool(result))
+}
+
+/// starts_with のOR条件処理
+fn apply_starts_with_or_condition(text: &str, pattern: &str) -> Result<Value, Error> {
+    let patterns: Vec<&str> = pattern.split('|').map(|p| p.trim()).collect();
+    let result = patterns.iter().any(|p| text.starts_with(p));
+    Ok(Value::Bool(result))
+}
+
+/// ends_with のOR条件処理
+fn apply_ends_with_or_condition(text: &str, pattern: &str) -> Result<Value, Error> {
+    let patterns: Vec<&str> = pattern.split('|').map(|p| p.trim()).collect();
+    let result = patterns.iter().any(|p| text.ends_with(p));
+    Ok(Value::Bool(result))
 }
 
 #[cfg(test)]
