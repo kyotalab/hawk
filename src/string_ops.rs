@@ -59,6 +59,9 @@ pub fn apply_string_operation(value: &Value, operation: &str) -> Result<Value, E
             Ok(Value::String(result))
         },
         op if op.starts_with("split(") && op.contains(")[") => {
+            apply_split_with_slice_range(value, op)
+        },
+        op if op.starts_with("split(") && op.contains(")[") => {
             // **新機能: split(...)[index] 形式の処理**
             apply_split_with_index(value, op)
         },
@@ -338,6 +341,109 @@ fn update_field_in_item(item: Value, field_path: &str, new_value: Value) -> Resu
         new_obj.insert(field_name.to_string(), new_value);
         Ok(Value::Object(new_obj))
     }
+}
+
+fn apply_split_with_slice_range(value: &Value, operation: &str) -> Result<Value, Error> {
+    // "split(\" \")[0:3]" のような形式を解析
+    let split_end = operation.find(")[").ok_or_else(|| {
+        Error::StringOperation("Invalid split with slice format".to_string())
+    })?;
+    
+    let bracket_start = split_end + 2; // ")[" の後
+    let bracket_end = operation.len() - 1; // 最後の ']'
+    
+    if !operation.ends_with(']') {
+        return Err(Error::StringOperation("Missing closing bracket in split slice".to_string()));
+    }
+    
+    // split部分とslice部分を分離
+    let split_part = &operation[..split_end + 1]; // "split(\" \")"
+    let slice_part = &operation[bracket_start..bracket_end]; // "0:3"
+    
+    // まずsplitを実行
+    let string_val = extract_string_value(value)?;
+    let delimiter = extract_string_argument(split_part)?;
+    let parts: Vec<String> = string_val.split(&delimiter).map(|s| s.to_string()).collect();
+    
+    // スライス記法を解析
+    if slice_part.contains(':') {
+        let (start, end) = parse_slice_notation_for_split(slice_part, parts.len())?;
+        let sliced_parts = apply_slice_to_string_array(&parts, start, end);
+        
+        let result: Vec<Value> = sliced_parts
+            .into_iter()
+            .map(|s| Value::String(s.to_string()))
+            .collect();
+        
+        Ok(Value::Array(result))
+    } else {
+        // 単一インデックスの場合
+        let index = slice_part.parse::<usize>().map_err(|_| {
+            Error::StringOperation(format!("Invalid array index: {}", slice_part))
+        })?;
+        
+        if let Some(part) = parts.get(index) {
+            Ok(Value::String(part.to_string()))
+        } else {
+            Ok(Value::String("".to_string())) // 範囲外は空文字列
+        }
+    }
+}
+
+/// 文字列配列用のスライス記法解析
+fn parse_slice_notation_for_split(slice_str: &str, array_len: usize) -> Result<(Option<usize>, Option<usize>), Error> {
+    let parts: Vec<&str> = slice_str.split(':').collect();
+    if parts.len() != 2 {
+        return Err(Error::StringOperation("Invalid slice format, expected start:end".to_string()));
+    }
+    
+    let start = if parts[0].is_empty() {
+        None
+    } else if parts[0].starts_with('-') {
+        // 負のインデックス対応
+        let neg_idx = parts[0][1..].parse::<usize>().map_err(|_| {
+            Error::StringOperation(format!("Invalid negative index: {}", parts[0]))
+        })?;
+        Some(if neg_idx > array_len { 0 } else { array_len - neg_idx })
+    } else {
+        Some(parts[0].parse::<usize>().map_err(|_| {
+            Error::StringOperation(format!("Invalid start index: {}", parts[0]))
+        })?)
+    };
+    
+    let end = if parts[1].is_empty() {
+        None
+    } else if parts[1].starts_with('-') {
+        // 負のインデックス対応
+        let neg_idx = parts[1][1..].parse::<usize>().map_err(|_| {
+            Error::StringOperation(format!("Invalid negative index: {}", parts[1]))
+        })?;
+        Some(if neg_idx > array_len { 0 } else { array_len - neg_idx })
+    } else {
+        Some(parts[1].parse::<usize>().map_err(|_| {
+            Error::StringOperation(format!("Invalid end index: {}", parts[1]))
+        })?)
+    };
+    
+    Ok((start, end))
+}
+
+/// 文字列配列にスライスを適用
+fn apply_slice_to_string_array(array: &[String], start: Option<usize>, end: Option<usize>) -> Vec<String> {
+    let len = array.len();
+    
+    let start_idx = start.unwrap_or(0);
+    let end_idx = end.unwrap_or(len);
+    
+    // 範囲チェック
+    let start_idx = start_idx.min(len);
+    let end_idx = end_idx.min(len);
+    
+    if start_idx >= end_idx {
+        return Vec::new();
+    }
+    
+    array[start_idx..end_idx].to_vec()
 }
 
 #[cfg(test)]
