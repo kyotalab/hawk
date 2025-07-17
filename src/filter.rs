@@ -86,6 +86,10 @@ fn apply_existing_simple_filter(data: Vec<Value>, condition: &str) -> Result<Vec
 
 pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec<Value>, Error> {
     let trimmed_op = operation.trim();
+
+    if operation.starts_with(".[") && operation.ends_with("]") {
+        return apply_universal_slice_operation(data, operation);
+    }
     
     if trimmed_op.starts_with("select(") && trimmed_op.ends_with(")") {
         // フィルタリング操作
@@ -535,7 +539,7 @@ fn evaluate_condition(item: &Value, field_path: &str, operator: &str, value: &st
     match operator {
         ">" => compare_greater(field_value, value),
         "<" => compare_less(field_value, value),
-        ">=" => !compare_greater_equal(field_value, value),
+        ">=" => compare_greater_equal(field_value, value),
         "<=" => compare_less_equal(field_value, value),
         "==" => compare_equal(field_value, value),
         "!=" => !compare_equal(field_value, value),
@@ -728,3 +732,507 @@ fn calculate_max(items: &[Value], field_name: &str) -> Result<Value, Error> {
         ))
     }
 }
+
+/// 配列に対してスライス操作を適用（汎用関数）
+pub fn apply_array_slice(array: &[Value], start: Option<usize>, end: Option<usize>) -> Vec<Value> {
+    let len = array.len();
+    
+    let start_idx = start.unwrap_or(0);
+    let end_idx = end.unwrap_or(len);
+    
+    // 範囲チェック
+    let start_idx = start_idx.min(len);
+    let end_idx = end_idx.min(len);
+    
+    if start_idx >= end_idx {
+        return Vec::new(); // 無効な範囲の場合は空を返す
+    }
+    
+    array[start_idx..end_idx].to_vec()
+}
+
+/// グループ化されたデータに対してスライスを適用
+pub fn apply_slice_to_grouped_data(data: Vec<Value>, start: Option<usize>, end: Option<usize>) -> Result<Vec<Value>, Error> {
+    let mut result = Vec::new();
+    
+    for group in data {
+        if let Value::Array(group_items) = group {
+            // 各グループに対してスライスを適用
+            let sliced_group = apply_array_slice(&group_items, start, end);
+            
+            // スライス結果を展開して結果に追加
+            result.extend(sliced_group);
+        } else {
+            // 配列でない場合はそのまま追加（エラー回避）
+            result.push(group);
+        }
+    }
+    
+    Ok(result)
+}
+
+/// スライス記法をパース ([start:end] 形式)
+pub fn parse_slice_notation(bracket_content: &str) -> Result<(Option<usize>, Option<usize>), Error> {
+    if !bracket_content.contains(':') {
+        return Err(Error::InvalidQuery("Not a slice notation".to_string()));
+    }
+    
+    let parts: Vec<&str> = bracket_content.split(':').collect();
+    if parts.len() != 2 {
+        return Err(Error::InvalidQuery("Invalid slice format, expected start:end".to_string()));
+    }
+    
+    let start = if parts[0].is_empty() {
+        None // 空の場合は先頭から
+    } else {
+        Some(parts[0].parse::<usize>().map_err(|_| {
+            Error::InvalidQuery(format!("Invalid start index: {}", parts[0]))
+        })?)
+    };
+    
+    let end = if parts[1].is_empty() {
+        None // 空の場合は末尾まで
+    } else {
+        Some(parts[1].parse::<usize>().map_err(|_| {
+            Error::InvalidQuery(format!("Invalid end index: {}", parts[1]))
+        })?)
+    };
+    
+    Ok((start, end))
+}
+
+/// 負のインデックスに対応したスライス解析
+pub fn parse_slice_notation_with_negative(bracket_content: &str, data_len: usize) -> Result<(Option<usize>, Option<usize>), Error> {
+    let parts: Vec<&str> = bracket_content.split(':').collect();
+    if parts.len() != 2 {
+        return Err(Error::InvalidQuery("Invalid slice format, expected start:end".to_string()));
+    }
+    
+    let start = if parts[0].is_empty() {
+        None
+    } else {
+        Some(parse_index_with_negative(parts[0], data_len)?)
+    };
+    
+    let end = if parts[1].is_empty() {
+        None
+    } else {
+        Some(parse_index_with_negative(parts[1], data_len)?)
+    };
+    
+    Ok((start, end))
+}
+
+/// 負のインデックス対応のインデックス解析
+pub fn parse_index_with_negative(index_str: &str, data_len: usize) -> Result<usize, Error> {
+    if index_str.starts_with('-') {
+        let negative_index = index_str[1..].parse::<usize>().map_err(|_| {
+            Error::InvalidQuery(format!("Invalid negative index: {}", index_str))
+        })?;
+        
+        if negative_index > data_len {
+            Ok(0) // 範囲外の場合は0に
+        } else {
+            Ok(data_len - negative_index)
+        }
+    } else {
+        index_str.parse::<usize>().map_err(|_| {
+            Error::InvalidQuery(format!("Invalid index: {}", index_str))
+        })
+    }
+}
+
+/// データ構造の種類を判定
+#[derive(Debug, PartialEq)]
+pub enum DataStructure {
+    GroupedData,    // group_by後：全て配列
+    RegularArray,   // 通常の配列：オブジェクトや値の配列
+    NestedArrays,   // ネストした配列：配列の配列（group_byではない）
+    Mixed,          // 混合
+}
+
+pub fn detect_data_structure(data: &[Value]) -> DataStructure {
+    if data.is_empty() {
+        return DataStructure::RegularArray;
+    }
+    
+    let all_arrays = data.iter().all(|item| item.is_array());
+    let all_objects = data.iter().all(|item| item.is_object());
+    let all_primitives = data.iter().all(|item| {
+        matches!(item, Value::String(_) | Value::Number(_) | Value::Bool(_) | Value::Null)
+    });
+    
+    if all_arrays {
+        // 全て配列の場合、group_byの結果かネストした配列かを判定
+        if is_likely_grouped_data(data) {
+            DataStructure::GroupedData
+        } else {
+            DataStructure::NestedArrays
+        }
+    } else if all_objects || all_primitives {
+        DataStructure::RegularArray
+    } else {
+        DataStructure::Mixed
+    }
+}
+
+/// group_byの結果らしいデータかを判定
+pub fn is_likely_grouped_data(data: &[Value]) -> bool {
+    // 簡単なヒューリスティック：
+    // 1. 全て配列
+    // 2. 各配列が空でない
+    // 3. 各配列の最初の要素が同じ構造（オブジェクト）
+    
+    if data.len() < 2 {
+        return false; // グループが1個だけの場合は判定困難
+    }
+    
+    for item in data {
+        if let Value::Array(arr) = item {
+            if arr.is_empty() {
+                return false;
+            }
+            if !arr[0].is_object() {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+    
+    true
+}
+
+/// ユニバーサルスライス操作（あらゆるデータに対応）
+pub fn apply_universal_slice_operation(data: Vec<Value>, operation: &str) -> Result<Vec<Value>, Error> {
+    let bracket_content = &operation[2..operation.len() - 1]; // ".["と"]"を除去
+    
+    // 負のインデックス対応の確認
+    if bracket_content.starts_with('-') && !bracket_content.contains(':') {
+        return apply_negative_index_slice(data, bracket_content);
+    }
+    
+    // 通常のスライス記法かどうかチェック
+    if !bracket_content.contains(':') {
+        // 単一インデックスの場合
+        let index = bracket_content.parse::<usize>().map_err(|_| {
+            Error::InvalidQuery(format!("Invalid index: {}", bracket_content))
+        })?;
+        
+        if let Some(item) = data.get(index) {
+            return Ok(vec![item.clone()]);
+        } else {
+            return Ok(vec![]); // インデックスが範囲外の場合は空を返す
+        }
+    }
+    
+    // スライス記法の解析
+    let (start, end) = parse_slice_notation_with_negative(bracket_content, data.len())?;
+    
+    // データ構造に応じた適切な処理
+    match detect_data_structure(&data) {
+        DataStructure::GroupedData => apply_slice_to_grouped_data(data, start, end),
+        DataStructure::RegularArray => apply_slice_to_regular_array(data, start, end),
+        DataStructure::NestedArrays => apply_slice_to_nested_arrays(data, start, end),
+        DataStructure::Mixed => apply_slice_to_regular_array(data, start, end), // デフォルト
+    }
+}
+
+/// 負のインデックス単体の処理
+pub fn apply_negative_index_slice(data: Vec<Value>, index_str: &str) -> Result<Vec<Value>, Error> {
+    let data_len = data.len();
+    let negative_index = index_str[1..].parse::<usize>().map_err(|_| {
+        Error::InvalidQuery(format!("Invalid negative index: {}", index_str))
+    })?;
+    
+    if negative_index > data_len || negative_index == 0 {
+        return Ok(vec![]); // 範囲外または-0の場合
+    }
+    
+    let actual_index = data_len - negative_index;
+    if let Some(item) = data.get(actual_index) {
+        Ok(vec![item.clone()])
+    } else {
+        Ok(vec![])
+    }
+}
+
+/// 通常の配列に対するスライス
+pub fn apply_slice_to_regular_array(data: Vec<Value>, start: Option<usize>, end: Option<usize>) -> Result<Vec<Value>, Error> {
+    let sliced = apply_array_slice(&data, start, end);
+    Ok(sliced)
+}
+
+/// ネストした配列に対するスライス
+pub fn apply_slice_to_nested_arrays(data: Vec<Value>, start: Option<usize>, end: Option<usize>) -> Result<Vec<Value>, Error> {
+    // ネストした配列の場合、外側の配列をスライスする（より直感的）
+    let sliced = apply_array_slice(&data, start, end);
+    Ok(sliced)
+}
+
+/// フィールド指定ソート操作
+pub fn apply_sort_with_field_operation(data: Vec<Value>, operation: &str) -> Result<Vec<Value>, Error> {
+    let field_path = &operation[5..operation.len() - 1]; // "sort(" と ")" を除去
+    
+    let mut sorted_data = data;
+    sorted_data.sort_by(|a, b| {
+        let value_a = extract_sort_key(a, field_path);
+        let value_b = extract_sort_key(b, field_path);
+        
+        compare_sort_values(&value_a, &value_b)
+    });
+    
+    Ok(sorted_data)
+}
+
+/// ソート用のキー値を抽出
+pub fn extract_sort_key(item: &Value, field_path: &str) -> Value {
+    if field_path.starts_with('.') {
+        let field_name = &field_path[1..];
+        item.get(field_name).cloned().unwrap_or(Value::Null)
+    } else {
+        item.clone()
+    }
+}
+
+/// ソート用の値比較
+pub fn compare_sort_values(a: &Value, b: &Value) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    
+    match (a, b) {
+        (Value::Number(n1), Value::Number(n2)) => {
+            let f1 = n1.as_f64().unwrap_or(0.0);
+            let f2 = n2.as_f64().unwrap_or(0.0);
+            f1.partial_cmp(&f2).unwrap_or(Ordering::Equal)
+        },
+        (Value::String(s1), Value::String(s2)) => s1.cmp(s2),
+        (Value::Bool(b1), Value::Bool(b2)) => b1.cmp(b2),
+        (Value::Null, Value::Null) => Ordering::Equal,
+        (Value::Null, _) => Ordering::Less,
+        (_, Value::Null) => Ordering::Greater,
+        _ => Ordering::Equal,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_apply_array_slice_basic() {
+        let array = vec![
+            json!("a"), json!("b"), json!("c"), json!("d"), json!("e")
+        ];
+        
+        // [0:3] -> ["a", "b", "c"]
+        let result = apply_array_slice(&array, Some(0), Some(3));
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], json!("a"));
+        assert_eq!(result[2], json!("c"));
+        
+        // [1:4] -> ["b", "c", "d"]
+        let result = apply_array_slice(&array, Some(1), Some(4));
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], json!("b"));
+        
+        // [:3] -> ["a", "b", "c"]
+        let result = apply_array_slice(&array, None, Some(3));
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], json!("a"));
+        
+        // [2:] -> ["c", "d", "e"]
+        let result = apply_array_slice(&array, Some(2), None);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], json!("c"));
+        
+        // 範囲外の場合
+        let result = apply_array_slice(&array, Some(10), Some(20));
+        assert_eq!(result.len(), 0);
+        
+        // 無効な範囲
+        let result = apply_array_slice(&array, Some(3), Some(1));
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_apply_slice_to_grouped_data() {
+        // group_by後のデータ形式をシミュレート
+        let grouped_data = vec![
+            json!([
+                {"category": "Electronics", "name": "Laptop", "price": 1200},
+                {"category": "Electronics", "name": "Phone", "price": 800},
+                {"category": "Electronics", "name": "Tablet", "price": 600},
+                {"category": "Electronics", "name": "Mouse", "price": 25}
+            ]),
+            json!([
+                {"category": "Books", "name": "Fiction", "price": 20},
+                {"category": "Books", "name": "Science", "price": 30},
+                {"category": "Books", "name": "History", "price": 25},
+                {"category": "Books", "name": "Biography", "price": 35}
+            ]),
+            json!([
+                {"category": "Clothing", "name": "Shirt", "price": 40},
+                {"category": "Clothing", "name": "Pants", "price": 60},
+                {"category": "Clothing", "name": "Shoes", "price": 80}
+            ])
+        ];
+        
+        // 各グループから最初の2個を取得
+        let result = apply_slice_to_grouped_data(grouped_data.clone(), Some(0), Some(2)).unwrap();
+        
+        // 結果の検証：3グループ × 2個 = 6個
+        assert_eq!(result.len(), 6);
+        
+        // Electronics グループの最初の2個
+        assert_eq!(result[0].get("name").unwrap(), &json!("Laptop"));
+        assert_eq!(result[1].get("name").unwrap(), &json!("Phone"));
+        
+        // Books グループの最初の2個
+        assert_eq!(result[2].get("name").unwrap(), &json!("Fiction"));
+        assert_eq!(result[3].get("name").unwrap(), &json!("Science"));
+        
+        // Clothing グループの最初の2個
+        assert_eq!(result[4].get("name").unwrap(), &json!("Shirt"));
+        assert_eq!(result[5].get("name").unwrap(), &json!("Pants"));
+    }
+
+    #[test]
+    fn test_apply_slice_to_grouped_data_different_ranges() {
+        let grouped_data = vec![
+            json!([
+                {"id": 1, "group": "A"},
+                {"id": 2, "group": "A"},
+                {"id": 3, "group": "A"},
+                {"id": 4, "group": "A"},
+                {"id": 5, "group": "A"}
+            ]),
+            json!([
+                {"id": 6, "group": "B"},
+                {"id": 7, "group": "B"},
+                {"id": 8, "group": "B"},
+                {"id": 9, "group": "B"}
+            ])
+        ];
+
+        // 各グループから2番目から4番目まで（インデックス1-3）
+        let result = apply_slice_to_grouped_data(grouped_data.clone(), Some(1), Some(4)).unwrap();
+        
+        // A群：3個（id: 2,3,4）、B群：3個（id: 7,8,9）= 合計6個
+        assert_eq!(result.len(), 6);
+        
+        // A群の結果確認
+        assert_eq!(result[0].get("id").unwrap(), &json!(2));
+        assert_eq!(result[1].get("id").unwrap(), &json!(3));
+        assert_eq!(result[2].get("id").unwrap(), &json!(4));
+        
+        // B群の結果確認
+        assert_eq!(result[3].get("id").unwrap(), &json!(7));
+        assert_eq!(result[4].get("id").unwrap(), &json!(8));
+        assert_eq!(result[5].get("id").unwrap(), &json!(9));
+    }
+
+    #[test]
+    fn test_parse_slice_notation() {
+        // 通常のスライス
+        let (start, end) = parse_slice_notation("0:5").unwrap();
+        assert_eq!(start, Some(0));
+        assert_eq!(end, Some(5));
+        
+        // 開始インデックスなし
+        let (start, end) = parse_slice_notation(":5").unwrap();
+        assert_eq!(start, None);
+        assert_eq!(end, Some(5));
+        
+        // 終了インデックスなし
+        let (start, end) = parse_slice_notation("2:").unwrap();
+        assert_eq!(start, Some(2));
+        assert_eq!(end, None);
+        
+        // 両方なし（全体）
+        let (start, end) = parse_slice_notation(":").unwrap();
+        assert_eq!(start, None);
+        assert_eq!(end, None);
+        
+        // エラーケース
+        assert!(parse_slice_notation("abc:def").is_err());
+        assert!(parse_slice_notation("0:5:10").is_err());
+    }
+
+    #[test]
+    fn test_parse_index_with_negative() {
+        // 正のインデックス
+        assert_eq!(parse_index_with_negative("5", 10).unwrap(), 5);
+        
+        // 負のインデックス
+        assert_eq!(parse_index_with_negative("-1", 10).unwrap(), 9);
+        assert_eq!(parse_index_with_negative("-3", 10).unwrap(), 7);
+        
+        // 範囲外の負のインデックス
+        assert_eq!(parse_index_with_negative("-15", 10).unwrap(), 0);
+        
+        // エラーケース
+        assert!(parse_index_with_negative("abc", 10).is_err());
+        assert!(parse_index_with_negative("-abc", 10).is_err());
+    }
+
+    #[test]
+    fn test_detect_data_structure() {
+        // 通常の配列
+        let regular = vec![json!({"id": 1}), json!({"id": 2})];
+        assert_eq!(detect_data_structure(&regular), DataStructure::RegularArray);
+        
+        // グループ化されたデータ
+        let grouped = vec![
+            json!([{"cat": "A", "val": 1}, {"cat": "A", "val": 2}]),
+            json!([{"cat": "B", "val": 3}, {"cat": "B", "val": 4}])
+        ];
+        assert_eq!(detect_data_structure(&grouped), DataStructure::GroupedData);
+        
+        // プリミティブ値の配列
+        let primitives = vec![json!(1), json!(2), json!(3)];
+        assert_eq!(detect_data_structure(&primitives), DataStructure::RegularArray);
+        
+        // 空配列
+        let empty: Vec<Value> = vec![];
+        assert_eq!(detect_data_structure(&empty), DataStructure::RegularArray);
+    }
+
+    #[test]
+    fn test_apply_sort_with_field_operation() {
+        let data = vec![
+            json!({"name": "Alice", "score": 85}),
+            json!({"name": "Bob", "score": 92}),
+            json!({"name": "Carol", "score": 78})
+        ];
+        
+        let result = apply_sort_with_field_operation(data, "sort(.score)").unwrap();
+        
+        // スコア順にソートされているか確認
+        assert_eq!(result[0].get("score").unwrap(), &json!(78)); // Carol
+        assert_eq!(result[1].get("score").unwrap(), &json!(85)); // Alice  
+        assert_eq!(result[2].get("score").unwrap(), &json!(92)); // Bob
+    }
+
+    #[test]
+    fn test_apply_negative_index_slice() {
+        let data = vec![
+            json!("a"), json!("b"), json!("c"), json!("d"), json!("e")
+        ];
+        
+        // .[-1] - 最後の要素
+        let result = apply_negative_index_slice(data.clone(), "-1").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], json!("e"));
+        
+        // .[-3] - 後ろから3番目
+        let result = apply_negative_index_slice(data.clone(), "-3").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], json!("c"));
+        
+        // 範囲外
+        let result = apply_negative_index_slice(data.clone(), "-10").unwrap();
+        assert_eq!(result.len(), 0);
+    }
+}
+
