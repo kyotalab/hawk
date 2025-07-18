@@ -1,0 +1,102 @@
+[
+  {
+    "instance_id": "i-0123456789abcdef0",
+    "instance_type": "t3.medium",
+    "state": "running",
+    "availability_zone": "us-west-2a",
+    "private_ip": "10.0.1.15",
+    "public_ip": "54.123.45.67",
+    "security_groups": ["sg-web", "sg-ssh"],
+    "tags": {
+      "Name": "web-server-01",
+      "Environment": "production",
+      "Team": "backend",
+      "Application": "web-app"
+    },
+    "launch_time": "2024-01-10T09:30:00Z",
+    "cpu_utilization": 45.2,
+    "memory_utilization": 62.8,
+    "network_in_mb": 125.4,
+    "network_out_mb": 89.2
+  },
+  {
+    "instance_id": "i-0fedcba987654321a",
+    "instance_type": "t3.large",
+    "state": "running",
+    "availability_zone": "us-west-2b",
+    "private_ip": "10.0.2.22",
+    "public_ip": "54.234.56.78",
+    "security_groups": ["sg-database", "sg-internal"],
+    "tags": {
+      "Name": "database-server-01",
+      "Environment": "production",
+      "Team": "database",
+      "Application": "postgres"
+    },
+    "launch_time": "2024-01-05T14:15:00Z",
+    "cpu_utilization": 78.5,
+    "memory_utilization": 85.3,
+    "network_in_mb": 45.7,
+    "network_out_mb": 67.1
+  },
+  {
+    "instance_id": "i-0abcdef123456789b",
+    "instance_type": "t3.small",
+    "state": "stopped",
+    "availability_zone": "us-west-2a",
+    "private_ip": "10.0.1.33",
+    "public_ip": null,
+    "security_groups": ["sg-staging"],
+    "tags": {
+      "Name": "staging-server-01",
+      "Environment": "staging",
+      "Team": "qa",
+      "Application": "test-app"
+    },
+    "launch_time": "2024-01-15T11:20:00Z",
+    "cpu_utilization": 0.0,
+    "memory_utilization": 0.0,
+    "network_in_mb": 0.0,
+    "network_out_mb": 0.0
+  },
+  {
+    "instance_id": "i-0987654321fedcbac",
+    "instance_type": "t3.xlarge",
+    "state": "running",
+    "availability_zone": "us-west-2c",
+    "private_ip": "10.0.3.44",
+    "public_ip": "54.345.67.89",
+    "security_groups": ["sg-processing", "sg-ssh"],
+    "tags": {
+      "Name": "batch-processor-01",
+      "Environment": "production",
+      "Team": "data",
+      "Application": "etl"
+    },
+    "launch_time": "2024-01-08T16:45:00Z",
+    "cpu_utilization": 92.7,
+    "memory_utilization": 76.4,
+    "network_in_mb": 234.8,
+    "network_out_mb": 456.2
+  },
+  {
+    "instance_id": "i-0456789abcdef012d",
+    "instance_type": "t3.micro",
+    "state": "running",
+    "availability_zone": "us-west-2a",
+    "private_ip": "10.0.1.55",
+    "public_ip": "54.456.78.90",
+    "security_groups": ["sg-monitoring", "sg-ssh"],
+    "tags": {
+      "Name": "monitoring-server-01",
+      "Environment": "production",
+      "Team": "devops",
+      "Application": "prometheus"
+    },
+    "launch_time": "2024-01-12T08:00:00Z",
+    "cpu_utilization": 25.3,
+    "memory_utilization": 48.9,
+    "network_in_mb": 15.6,
+    "network_out_mb": 22.1
+  }
+]

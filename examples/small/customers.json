@@ -1,0 +1,112 @@
+[
+  {
+    "id": "CUST001",
+    "name": "Alice Johnson",
+    "email": "alice.johnson@techcorp.com",
+    "company": "TechCorp Inc",
+    "country": "USA",
+    "status": "active",
+    "lifetime_value": 15240.5,
+    "segment": "enterprise",
+    "registration_date": "2023-01-15"
+  },
+  {
+    "id": "CUST002",
+    "name": "Bob Smith",
+    "email": "bob.smith@startup.io",
+    "company": "StartupXYZ",
+    "country": "Canada",
+    "status": "active",
+    "lifetime_value": 8500.25,
+    "segment": "business",
+    "registration_date": "2023-03-22"
+  },
+  {
+    "id": "CUST003",
+    "name": "Carol Wang",
+    "email": "carol.wang@example.com",
+    "company": "Global Solutions",
+    "country": "USA",
+    "status": "inactive",
+    "lifetime_value": 12750.75,
+    "segment": "enterprise",
+    "registration_date": "2022-11-08"
+  },
+  {
+    "id": "CUST004",
+    "name": "David Brown",
+    "email": "david.brown@smallbiz.com",
+    "company": "Small Business Co",
+    "country": "UK",
+    "status": "active",
+    "lifetime_value": 3200.0,
+    "segment": "small",
+    "registration_date": "2024-01-10"
+  },
+  {
+    "id": "CUST005",
+    "name": "Elena Rodriguez",
+    "email": "elena.rodriguez@innovate.es",
+    "company": "Innovate España",
+    "country": "Spain",
+    "status": "active",
+    "lifetime_value": 9875.5,
+    "segment": "business",
+    "registration_date": "2023-06-14"
+  },
+  {
+    "id": "CUST006",
+    "name": "Frank Chen",
+    "email": "frank.chen@testcompany.com",
+    "company": "Test Company",
+    "country": "USA",
+    "status": "suspended",
+    "lifetime_value": 0.0,
+    "segment": "test",
+    "registration_date": "2024-02-01"
+  },
+  {
+    "id": "CUST007",
+    "name": "Grace Kim",
+    "email": "grace.kim@fintech.kr",
+    "company": "FinTech Korea",
+    "country": "South Korea",
+    "status": "active",
+    "lifetime_value": 18920.25,
+    "segment": "enterprise",
+    "registration_date": "2022-09-30"
+  },
+  {
+    "id": "CUST008",
+    "name": "Henry Taylor",
+    "email": "henry.taylor@demo.org",
+    "company": "Demo Organization",
+    "country": "Australia",
+    "status": "inactive",
+    "lifetime_value": 1500.0,
+    "segment": "demo",
+    "registration_date": "2024-03-15"
+  },
+  {
+    "id": "CUST009",
+    "name": "Irene Foster",
+    "email": "irene.foster@enterprise.de",
+    "company": "Enterprise Germany",
+    "country": "Germany",
+    "status": "active",
+    "lifetime_value": 22450.75,
+    "segment": "enterprise",
+    "registration_date": "2023-04-20"
+  },
+  {
+    "id": "CUST010",
+    "name": "Jack Wilson",
+    "email": "jack.wilson@temp.example",
+    "company": "Temporary Inc",
+    "country": "Canada",
+    "status": "deleted",
+    "lifetime_value": 500.0,
+    "segment": "temp",
+    "registration_date": "2024-01-01"
+  }
+]

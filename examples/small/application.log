@@ -1,0 +1,53 @@
+2024-07-18 09:15:23 INFO  [main] Application started successfully on port 8080
+2024-07-18 09:15:24 DEBUG [worker-1] Loading configuration from /etc/app/config.yaml
+2024-07-18 09:15:25 INFO  [database] Connected to PostgreSQL database: app_production
+2024-07-18 09:15:26 DEBUG [cache] Redis connection established: localhost:6379
+2024-07-18 09:15:27 INFO  [auth] JWT authentication module initialized
+2024-07-18 09:15:28 DEBUG [worker-2] Processing request GET /api/v1/health
+2024-07-18 09:15:29 INFO  [metrics] Prometheus metrics endpoint available at /metrics
+2024-07-18 09:15:30 DEBUG [worker-1] Request completed: GET /api/v1/health - 200 OK (15ms)
+2024-07-18 09:16:15 INFO  [worker-3] User login successful: user_id=12345, email=alice@company.com
+2024-07-18 09:16:45 DEBUG [worker-2] Processing request POST /api/v1/orders
+2024-07-18 09:16:46 INFO  [validation] Order validation passed: order_id=ORD001
+2024-07-18 09:16:47 DEBUG [database] Executing SQL: INSERT INTO orders (id, customer_id, total) VALUES ($1, $2, $3)
+2024-07-18 09:16:48 INFO  [worker-2] Order created successfully: order_id=ORD001, total=$299.99
+2024-07-18 09:17:12 WARN  [worker-1] Slow query detected: SELECT * FROM products WHERE category='electronics' (2.5s)
+2024-07-18 09:17:30 ERROR [worker-4] Database connection failed: connection timeout after 30s
+2024-07-18 09:17:31 ERROR [retry] Retrying database connection (attempt 1/3)
+2024-07-18 09:17:32 INFO  [worker-4] Database connection restored successfully
+2024-07-18 09:18:05 DEBUG [cache] Cache hit for key: user_profile_12345
+2024-07-18 09:18:22 WARN  [queue] Queue size approaching limit: 950/1000 messages
+2024-07-18 09:18:45 INFO  [worker-5] User logout: user_id=12345, session_duration=2m30s
+2024-07-18 09:19:10 DEBUG [worker-1] Processing request GET /api/v1/products?category=electronics
+2024-07-18 09:19:11 INFO  [search] Search query executed: 'electronics', results=25, duration=45ms
+2024-07-18 09:19:33 ERROR [payment] Payment processing failed: card_declined, order_id=ORD002
+2024-07-18 09:19:34 WARN  [notification] Failed to send payment failure email to customer@example.com
+2024-07-18 09:20:01 INFO  [scheduler] Starting scheduled job: daily_report_generation
+2024-07-18 09:20:15 DEBUG [worker-3] Processing request PUT /api/v1/users/12345/profile
+2024-07-18 09:20:16 INFO  [validation] Profile update validation passed for user_id=12345
+2024-07-18 09:20:17 DEBUG [database] Executing SQL: UPDATE users SET profile_data=$1 WHERE id=$2
+2024-07-18 09:20:45 CRITICAL [security] Multiple failed login attempts detected: IP=192.168.1.100, attempts=5
+2024-07-18 09:20:46 INFO  [security] IP address blocked for 1 hour: 192.168.1.100
+2024-07-18 09:21:12 ERROR [external_api] Third-party API call failed: timeout to payments.example.com
+2024-07-18 09:21:13 WARN  [circuit_breaker] Circuit breaker opened for payments service
+2024-07-18 09:21:30 DEBUG [worker-2] Processing request DELETE /api/v1/cart/items/123
+2024-07-18 09:21:31 INFO  [cart] Item removed from cart: user_id=67890, item_id=123
+2024-07-18 09:22:05 INFO  [health_check] All services healthy: database=OK, cache=OK, queue=OK
+2024-07-18 09:22:30 DEBUG [worker-4] Processing request GET /api/v1/analytics/dashboard
+2024-07-18 09:22:31 WARN  [performance] High memory usage detected: 85% of available memory
+2024-07-18 09:22:55 ERROR [file_system] Failed to write log file: disk space low (5% remaining)
+2024-07-18 09:23:10 FATAL [storage] Critical disk space shortage: less than 1GB remaining
+2024-07-18 09:23:11 ERROR [alert] Failed to send critical alert: notification service unavailable
+2024-07-18 09:23:30 INFO  [maintenance] Starting automated cleanup: removing old log files
+2024-07-18 09:23:45 DEBUG [cleanup] Removed 150 old log files, freed 2.5GB disk space
+2024-07-18 09:24:01 INFO  [recovery] System recovered from disk space issue
+2024-07-18 09:24:15 DEBUG [worker-1] Processing request GET /api/v1/reports/sales
+2024-07-18 09:24:16 INFO  [reports] Sales report generated: period=2024-07, total_orders=1250
+2024-07-18 09:24:45 WARN  [rate_limit] Rate limit exceeded for API key: api_key_abc123 (100 req/min)
+2024-07-18 09:25:10 DEBUG [worker-3] Processing request POST /api/v1/feedback
+2024-07-18 09:25:11 INFO  [feedback] Customer feedback submitted: rating=5, order_id=ORD003
+2024-07-18 09:25:30 ERROR [email] SMTP server connection failed: authentication error
+2024-07-18 09:25:45 INFO  [backup] Database backup completed successfully: backup_20240718_092545.sql
+2024-07-18 09:26:00 DEBUG [worker-2] Processing request GET /api/v1/inventory/status
+2024-07-18 09:26:15 WARN  [inventory] Low stock alert: product_id=PROD001, quantity=5 remaining
+2024-07-18 09:26:30 INFO  [scheduler] Scheduled job completed: daily_report_generation (duration=6m30s)

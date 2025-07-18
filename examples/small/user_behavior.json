@@ -1,0 +1,338 @@
+[
+  {
+    "session_id": "sess_123456789",
+    "user_id": "user_001",
+    "timestamp": "2024-07-18T14:30:15Z",
+    "page": "/products/electronics",
+    "action": "page_view",
+    "duration_seconds": 45,
+    "device": "desktop",
+    "browser": "Chrome",
+    "location": {
+      "country": "USA",
+      "state": "California",
+      "city": "San Francisco"
+    },
+    "referrer": "https://google.com/search?q=wireless+headphones"
+  },
+  {
+    "session_id": "sess_123456789",
+    "user_id": "user_001",
+    "timestamp": "2024-07-18T14:31:00Z",
+    "page": "/products/headphones/wireless",
+    "action": "click",
+    "duration_seconds": 120,
+    "device": "desktop",
+    "browser": "Chrome",
+    "location": {
+      "country": "USA",
+      "state": "California",
+      "city": "San Francisco"
+    },
+    "referrer": "/products/electronics"
+  },
+  {
+    "session_id": "sess_987654321",
+    "user_id": "user_002",
+    "timestamp": "2024-07-18T14:32:30Z",
+    "page": "/cart",
+    "action": "add_to_cart",
+    "duration_seconds": 15,
+    "device": "mobile",
+    "browser": "Safari",
+    "location": {
+      "country": "Canada",
+      "state": "Ontario",
+      "city": "Toronto"
+    },
+    "referrer": "/products/accessories/cables"
+  },
+  {
+    "session_id": "sess_456789123",
+    "user_id": "user_003",
+    "timestamp": "2024-07-18T14:33:45Z",
+    "page": "/checkout",
+    "action": "purchase",
+    "duration_seconds": 180,
+    "device": "desktop",
+    "browser": "Firefox",
+    "location": {
+      "country": "UK",
+      "state": "England",
+      "city": "London"
+    },
+    "referrer": "/cart"
+  },
+  {
+    "session_id": "sess_789123456",
+    "user_id": "user_004",
+    "timestamp": "2024-07-18T14:35:00Z",
+    "page": "/support/contact",
+    "action": "page_view",
+    "duration_seconds": 90,
+    "device": "tablet",
+    "browser": "Chrome",
+    "location": {
+      "country": "Germany",
+      "state": "Bavaria",
+      "city": "Munich"
+    },
+    "referrer": "/products/monitors"
+  },
+  {
+    "session_id": "sess_321654987",
+    "user_id": "user_005",
+    "timestamp": "2024-07-18T14:36:15Z",
+    "page": "/login",
+    "action": "login_attempt",
+    "duration_seconds": 30,
+    "device": "mobile",
+    "browser": "Safari",
+    "location": {
+      "country": "Australia",
+      "state": "New South Wales",
+      "city": "Sydney"
+    },
+    "referrer": "/account/dashboard"
+  },
+  {
+    "session_id": "sess_654987321",
+    "user_id": "user_006",
+    "timestamp": "2024-07-18T14:37:30Z",
+    "page": "/search",
+    "action": "search",
+    "duration_seconds": 25,
+    "device": "desktop",
+    "browser": "Edge",
+    "location": {
+      "country": "USA",
+      "state": "New York",
+      "city": "New York"
+    },
+    "referrer": "https://bing.com/search?q=laptop+stand"
+  },
+  {
+    "session_id": "sess_147258369",
+    "user_id": "user_007",
+    "timestamp": "2024-07-18T14:38:45Z",
+    "page": "/products/office/stands",
+    "action": "page_view",
+    "duration_seconds": 75,
+    "device": "desktop",
+    "browser": "Chrome",
+    "location": {
+      "country": "Japan",
+      "state": "Tokyo",
+      "city": "Tokyo"
+    },
+    "referrer": "/search"
+  },
+  {
+    "session_id": "sess_369258147",
+    "user_id": "user_008",
+    "timestamp": "2024-07-18T14:40:00Z",
+    "page": "/wishlist",
+    "action": "add_to_wishlist",
+    "duration_seconds": 10,
+    "device": "mobile",
+    "browser": "Chrome",
+    "location": {
+      "country": "France",
+      "state": "Île-de-France",
+      "city": "Paris"
+    },
+    "referrer": "/products/keyboards/mechanical"
+  },
+  {
+    "session_id": "sess_258147369",
+    "user_id": "user_009",
+    "timestamp": "2024-07-18T14:41:15Z",
+    "page": "/products/webcams",
+    "action": "page_view",
+    "duration_seconds": 60,
+    "device": "desktop",
+    "browser": "Safari",
+    "location": {
+      "country": "Brazil",
+      "state": "São Paulo",
+      "city": "São Paulo"
+    },
+    "referrer": "/categories/electronics"
+  },
+  {
+    "session_id": "sess_741852963",
+    "user_id": "user_010",
+    "timestamp": "2024-07-18T14:42:30Z",
+    "page": "/reviews",
+    "action": "write_review",
+    "duration_seconds": 300,
+    "device": "desktop",
+    "browser": "Firefox",
+    "location": {
+      "country": "India",
+      "state": "Maharashtra",
+      "city": "Mumbai"
+    },
+    "referrer": "/products/monitors/4k"
+  },
+  {
+    "session_id": "sess_852963741",
+    "user_id": "user_011",
+    "timestamp": "2024-07-18T14:45:00Z",
+    "page": "/account/orders",
+    "action": "page_view",
+    "duration_seconds": 40,
+    "device": "mobile",
+    "browser": "Safari",
+    "location": {
+      "country": "Mexico",
+      "state": "Mexico City",
+      "city": "Mexico City"
+    },
+    "referrer": "/login"
+  },
+  {
+    "session_id": "sess_963741852",
+    "user_id": "user_012",
+    "timestamp": "2024-07-18T14:46:15Z",
+    "page": "/help/faq",
+    "action": "page_view",
+    "duration_seconds": 150,
+    "device": "tablet",
+    "browser": "Chrome",
+    "location": {
+      "country": "South Korea",
+      "state": "Seoul",
+      "city": "Seoul"
+    },
+    "referrer": "/support/contact"
+  },
+  {
+    "session_id": "sess_159357426",
+    "user_id": "user_013",
+    "timestamp": "2024-07-18T14:48:30Z",
+    "page": "/logout",
+    "action": "logout",
+    "duration_seconds": 5,
+    "device": "desktop",
+    "browser": "Chrome",
+    "location": {
+      "country": "Netherlands",
+      "state": "North Holland",
+      "city": "Amsterdam"
+    },
+    "referrer": "/account/settings"
+  },
+  {
+    "session_id": "sess_357426159",
+    "user_id": "user_014",
+    "timestamp": "2024-07-18T14:50:00Z",
+    "page": "/newsletter/signup",
+    "action": "newsletter_signup",
+    "duration_seconds": 45,
+    "device": "mobile",
+    "browser": "Firefox",
+    "location": {
+      "country": "Italy",
+      "state": "Lazio",
+      "city": "Rome"
+    },
+    "referrer": "/home"
+  },
+  {
+    "session_id": "sess_426159357",
+    "user_id": "user_015",
+    "timestamp": "2024-07-18T14:51:30Z",
+    "page": "/categories/office",
+    "action": "page_view",
+    "duration_seconds": 35,
+    "device": "desktop",
+    "browser": "Edge",
+    "location": {
+      "country": "Russia",
+      "state": "Moscow",
+      "city": "Moscow"
+    },
+    "referrer": "/home"
+  },
+  {
+    "session_id": "sess_591837264",
+    "user_id": "user_016",
+    "timestamp": "2024-07-18T14:53:00Z",
+    "page": "/products/organizers",
+    "action": "page_view",
+    "duration_seconds": 80,
+    "device": "desktop",
+    "browser": "Chrome",
+    "location": {
+      "country": "Spain",
+      "state": "Madrid",
+      "city": "Madrid"
+    },
+    "referrer": "/categories/office"
+  },
+  {
+    "session_id": "sess_837264591",
+    "user_id": "user_017",
+    "timestamp": "2024-07-18T14:54:45Z",
+    "page": "/compare",
+    "action": "product_compare",
+    "duration_seconds": 120,
+    "device": "tablet",
+    "browser": "Safari",
+    "location": {
+      "country": "Argentina",
+      "state": "Buenos Aires",
+      "city": "Buenos Aires"
+    },
+    "referrer": "/products/headphones"
+  },
+  {
+    "session_id": "sess_264591837",
+    "user_id": "user_018",
+    "timestamp": "2024-07-18T14:56:30Z",
+    "page": "/blog/tech-news",
+    "action": "page_view",
+    "duration_seconds": 200,
+    "device": "desktop",
+    "browser": "Firefox",
+    "location": {
+      "country": "Sweden",
+      "state": "Stockholm",
+      "city": "Stockholm"
+    },
+    "referrer": "https://twitter.com/company"
+  },
+  {
+    "session_id": "sess_975318642",
+    "user_id": "user_019",
+    "timestamp": "2024-07-18T14:58:15Z",
+    "page": "/sitemap",
+    "action": "page_view",
+    "duration_seconds": 20,
+    "device": "mobile",
+    "browser": "Chrome",
+    "location": {
+      "country": "Turkey",
+      "state": "Istanbul",
+      "city": "Istanbul"
+    },
+    "referrer": "/help/faq"
+  },
+  {
+    "session_id": "sess_318642975",
+    "user_id": "user_020",
+    "timestamp": "2024-07-18T15:00:00Z",
+    "page": "/contact/sales",
+    "action": "contact_form",
+    "duration_seconds": 240,
+    "device": "desktop",
+    "browser": "Safari",
+    "location": {
+      "country": "South Africa",
+      "state": "Western Cape",
+      "city": "Cape Town"
+    },
+    "referrer": "/products/enterprise"
+  }
+]

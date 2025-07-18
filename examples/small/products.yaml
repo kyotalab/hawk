@@ -1,0 +1,102 @@
+products:
+  - id: PROD001
+    name: "Wireless Headphones"
+    category: "Electronics"
+    price: 299.99
+    in_stock: true
+    supplier: "AudioTech"
+    specifications:
+      color: ["black", "white", "blue"]
+      warranty_months: 24
+      weight_grams: 250
+    tags: ["bluetooth", "noise-canceling", "premium"]
+
+  - id: PROD002
+    name: "USB-C Cable"
+    category: "Accessories"
+    price: 49.99
+    in_stock: true
+    supplier: "CableCorp"
+    specifications:
+      length_meters: 2
+      data_speed: "USB 3.0"
+      warranty_months: 12
+    tags: ["usb-c", "fast-charging", "durable"]
+
+  - id: PROD003
+    name: "Laptop Stand"
+    category: "Office"
+    price: 599.99
+    in_stock: false
+    supplier: "OfficeGear"
+    specifications:
+      material: "aluminum"
+      adjustable: true
+      max_weight_kg: 10
+      warranty_months: 36
+    tags: ["ergonomic", "adjustable", "premium"]
+
+  - id: PROD004
+    name: "Mouse Pad"
+    category: "Accessories"
+    price: 49.99
+    in_stock: true
+    supplier: "DeskMate"
+    specifications:
+      size: "large"
+      material: "fabric"
+      non_slip: true
+      warranty_months: 6
+    tags: ["gaming", "large", "non-slip"]
+
+  - id: PROD005
+    name: "4K Monitor"
+    category: "Electronics"
+    price: 899.99
+    in_stock: true
+    supplier: "DisplayTech"
+    specifications:
+      size_inches: 27
+      resolution: "3840x2160"
+      refresh_rate_hz: 60
+      warranty_months: 24
+    tags: ["4k", "monitor", "professional"]
+
+  - id: PROD006
+    name: "Mechanical Keyboard"
+    category: "Electronics"
+    price: 199.99
+    in_stock: false
+    supplier: "KeyCraft"
+    specifications:
+      switch_type: "blue"
+      backlit: true
+      wireless: false
+      warranty_months: 12
+    tags: ["mechanical", "tactile", "gaming"]
+
+  - id: PROD007
+    name: "Webcam HD"
+    category: "Electronics"
+    price: 149.99
+    in_stock: true
+    supplier: "VideoTech"
+    specifications:
+      resolution: "1080p"
+      frame_rate: 30
+      auto_focus: true
+      warranty_months: 18
+    tags: ["hd", "streaming", "auto-focus"]
+
+  - id: PROD008
+    name: "Desk Organizer"
+    category: "Office"
+    price: 79.99
+    in_stock: true
+    supplier: "OfficeGear"
+    specifications:
+      material: "bamboo"
+      compartments: 6
+      eco_friendly: true
+      warranty_months: 12
+    tags: ["bamboo", "eco-friendly", "organizer"]

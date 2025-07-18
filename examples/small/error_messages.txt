@@ -1,0 +1,15 @@
+ERROR: Database connection timeout after 30 seconds
+WARNING: Memory usage exceeded 80% threshold (current: 85%)
+CRITICAL: Disk space below 5% on /var/log partition
+INFO: User session expired, redirecting to login page
+DEBUG: Cache miss for key user_profile_12345
+FATAL: Unable to start application server on port 8080
+ERROR: Payment processing failed - card declined
+WARNING: Rate limit exceeded for API key abc123
+CRITICAL: Security breach detected - multiple failed login attempts
+INFO: Scheduled maintenance window starting in 10 minutes
+ERROR: Failed to send notification email to user@example.com
+WARNING: SSL certificate expires in 7 days
+DEBUG: SQL query execution time: 2.5 seconds (slow query)
+FATAL: Out of memory - cannot allocate additional heap space
+ERROR: External API call failed - timeout to payments.example.com

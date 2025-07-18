@@ -1,9 +1,0 @@
-id,date,product,category,price,quantity,customer_name,customer_email,region,sales_rep
-1,2024-01-15,Laptop Pro,Electronics,1299.99,2,John Doe,john@example.com,North America,Alice Johnson
-2,2024-01-18,Wireless Mouse,Electronics,49.99,5,Jane Smith,jane@example.com,Europe,Bob Smith
-3,2024-02-02,Office Chair,Furniture,299.99,1,Mike Johnson,mike@example.com,Asia,Carol Williams
-4,2024-02-10,Smartphone,Electronics,899.99,3,Sarah Brown,sarah@example.com,North America,David Brown
-5,2024-02-15,Standing Desk,Furniture,499.99,2,Tom Wilson,tom@example.com,Europe,Eva Garcia
-6,2024-03-01,Tablet,Electronics,329.99,4,Lisa Davis,lisa@example.com,Asia,Frank Wilson
-7,2024-03-08,Monitor,Electronics,249.99,3,Chris Lee,chris@example.com,North America,Grace Lee
-8,2024-03-12,Bookshelf,Furniture,159.99,1,Amy Taylor,amy@example.com,Europe,Henry Martinez

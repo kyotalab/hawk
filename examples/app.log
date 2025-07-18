@@ -1,5 +1,0 @@
-2024-01-15 09:00:01 INFO Application started successfully
-2024-01-15 09:00:02 DEBUG Loading configuration from /etc/app/config.json
-2024-01-15 09:01:23 ERROR Failed to process user request: connection timeout
-2024-01-15 09:01:24 INFO Retrying connection...
-2024-01-15 09:02:45 WARN High memory usage detected: 85%

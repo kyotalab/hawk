@@ -5,14 +5,215 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2025-07-18
+
+### 🎉 New Features
+
+#### Logical Operations
+
+- **NOT operator support**: Added `not` operator for negating conditions in `select()` statements
+
+  - Syntax: `select(not (.condition))` - parentheses are required for clarity
+  - Works with all comparison operators and string operations
+  - Examples: `select(not (.age > 65))`, `select(not (.email | contains("spam")))`
+
+- **OR operator support**: Added pipe-delimited pattern matching for OR conditions
+  - Syntax: `select(.field | contains("pattern1|pattern2|pattern3"))`
+  - Multi-pattern matching in a single operation
+  - Examples: `select(.level | contains("ERROR|FATAL"))`, `select(.role | contains("admin|manager|supervisor"))`
+
+#### Array Slicing Operations
+
+- **Python-style slicing**: Complete slice notation support for arrays and string split results
+
+  - Basic slicing: `.[start:end]`, `.[start:]`, `.[:end]`, `.[:]`
+  - Negative index support: `.[-5:]`, `.[:-3]`, `.[-10:-5]`
+  - Field-specific slicing: `.users[0:10]`, `.logs[-100:]`
+
+- **String split slicing**: Advanced slicing support for string split operations
+
+  - Direct slicing after split: `split(",")[1:3]`, `split("/")[-1]`
+  - Complex path processing: `split("/")[1:-1]` for middle path components
+  - CSV column extraction: `split(",")[2:5]` for specific column ranges
+
+- **Negative indexing**: Support for negative array indices
+  - Last element access: `.array[-1]`, `.users[-1]`
+  - Reverse indexing: `.array[-3]` for third from last
+  - Compatible with all array operations
+
+#### Enhanced Filtering Capabilities
+
+- **Complex logical combinations**: Combine NOT and OR operations for sophisticated filtering
+
+  - Example: `select(not (.status | contains("deleted|suspended|inactive")))`
+  - Multi-condition filtering: `select(not (.type | contains("debug|trace|verbose")))`
+
+- **Pattern-based exclusion**: Exclude multiple patterns efficiently
+  - File filtering: `select(not (.filename | contains(".tmp|.bak|.swp")))`
+  - Content filtering: `select(not (. | contains("DEBUG|INFO|TRACE")))`
+
+### 🔧 Improvements
+
+#### Enhanced String Operations
+
+- **Improved split operations**: Better integration with slicing for complex text processing
+- **Optimized pattern matching**: More efficient OR pattern processing with pipe-delimited syntax
+- **Better error handling**: Clearer error messages for logical operation syntax errors
+
+#### Performance Optimizations
+
+- **Slice operation efficiency**: Optimized memory usage for large array slicing operations
+- **Pattern matching performance**: Improved performance for multi-pattern OR operations
+- **Logical operation caching**: Better performance for complex NOT/OR combinations
+
+#### Documentation and Examples
+
+- **Comprehensive logical operation examples**: Real-world use cases for NOT and OR operations
+- **Slicing operation guide**: Complete reference for all slicing capabilities
+- **Advanced filtering patterns**: Examples combining multiple logical operations
+
+### 📊 New Use Cases Enabled
+
+#### Advanced Log Analysis
+
+```bash
+# Exclude multiple log levels efficiently
+hawk '. | select(not (.level | contains("DEBUG|INFO|TRACE")))' app.log
+
+# Get recent critical errors only
+hawk '.logs[-1000:] | select(.level | contains("ERROR|FATAL|CRITICAL"))' system.log
+
+# Extract specific time ranges with slicing
+hawk '.logs[] | .timestamp | split("T")[0] | split("-")[1:3]' logs.json
+```
+
+#### Sophisticated Data Filtering
+
+```bash
+# Filter active users excluding test accounts
+hawk '.users[] | select(not (.email | contains("test|demo|temp")))' users.json
+
+# Find high-priority items excluding archived
+hawk '.items[] | select(.priority | contains("high|urgent")) | select(not (.status | contains("archived|deleted")))' items.json
+
+# Process middle sections of arrays
+hawk '.data[100:200] | select(not (.type | contains("noise|test")))' dataset.json
+```
+
+#### Complex Text Processing
+
+```bash
+# Extract domain names efficiently
+hawk '.urls[] | split("://")[1] | split("/")[0]' urls.txt
+
+# Get file paths without extension
+hawk '.files[] | .path | split(".")[:-1] | join(".")' filelist.json
+
+# Process CSV columns with exclusions
+hawk -t '. | split(",")[2:8] | select(not (.[0] | contains("null|empty|N/A")))' data.csv
+```
+
+#### Advanced Data Analysis Workflows
+
+```bash
+# Multi-step filtering with slicing
+hawk '.events[0:5000] | select(not (.type | contains("debug|trace"))) | group_by(.service) | count' events.json
+
+# Recent data analysis with pattern exclusion
+hawk '.metrics[-500:] | select(not (.source | contains("test|staging"))) | avg(.value)' metrics.json
+
+# Complex field extraction with logical operations
+hawk '.users[] | select(.role | contains("admin|manager")) | select(not (.status | contains("inactive|suspended"))) | count' users.json
+```
+
+### 🛠️ Technical Improvements
+
+#### Filter Module Enhancements
+
+- **New function `parse_not_condition_with_parentheses`**: Robust NOT operator parsing with mandatory parentheses
+- **Enhanced `apply_filter_with_string_operations`**: Support for NOT operator in string operation pipelines
+- **Improved error handling**: Better error messages for missing parentheses and invalid syntax
+
+#### Slicing Infrastructure
+
+- **Universal slicing support**: `apply_universal_slice_operation` handles all data types
+- **Negative index processing**: `parse_index_with_negative` for Python-style negative indexing
+- **Data structure detection**: `detect_data_structure` for intelligent slicing behavior
+
+#### Pattern Matching Optimization
+
+- **OR pattern preprocessing**: Efficient pipe-delimited pattern parsing
+- **Multi-pattern contains operations**: Optimized string matching for multiple patterns
+- **Regex-free implementation**: Fast pattern matching without regex overhead
+
+### 🔄 Breaking Changes
+
+None. This release is fully backward compatible with v0.2.x.
+
+### 🐛 Bug Fixes
+
+- Fixed slice boundary checking for out-of-range indices
+- Improved pattern matching edge cases with empty patterns
+- Enhanced error reporting for malformed logical operations
+- Fixed memory usage issues with large slice operations
+
+### 📖 Documentation Updates
+
+- **Complete logical operations reference**: Documentation for NOT and OR operators
+- **Comprehensive slicing guide**: All slicing capabilities with examples
+- **Advanced filtering patterns**: Real-world use case examples
+- **Performance best practices**: Guidelines for efficient query construction
+
+### 🚀 Migration Guide
+
+#### For users upgrading from v0.2.1:
+
+All existing queries continue to work without changes. New features are additive:
+
+**New NOT operator usage:**
+
+```bash
+# Old approach (still works)
+hawk '.users[] | select(.age <= 65)' users.json
+
+# New approach with NOT operator
+hawk '.users[] | select(not (.age > 65))' users.json
+```
+
+**New OR operator usage:**
+
+```bash
+# Old approach with multiple queries
+hawk '.logs[] | select(.level == "ERROR")' logs.json
+hawk '.logs[] | select(.level == "FATAL")' logs.json
+
+# New approach with OR operator
+hawk '.logs[] | select(.level | contains("ERROR|FATAL"))' logs.json
+```
+
+**New slicing capabilities:**
+
+```bash
+# Get last 10 users (new)
+hawk '.users[-10:]' users.json
+
+# Get middle section of data (new)
+hawk '.data[100:200]' data.json
+
+# Extract filename from path (new)
+hawk '.files[] | .path | split("/")[-1]' files.json
+```
+
 ## [0.2.1] - 2024-07-16
 
 ### 🐛 Bug Fixes
+
 - Fixed single object field access (e.g., `.Parameters` in CloudFormation templates)
 - Corrected info display for single objects ("Single Object" vs "Object Array")
 - Enhanced support for YAML/JSON single object files
 
 ### 🔧 Improvements
+
 - Better error messages for field access
 - Improved CloudFormation, Docker Compose, Kubernetes manifest support
 

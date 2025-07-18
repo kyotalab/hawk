@@ -1,6 +1,0 @@
-[
-  {"product": "Laptop", "price": 1200, "quantity": 5, "category": "Electronics"},
-  {"product": "Mouse", "price": 25, "quantity": 50, "category": "Electronics"},
-  {"product": "Book", "price": 15, "quantity": 100, "category": "Education"},
-  {"product": "Chair", "price": 300, "quantity": 10, "category": "Furniture"}
-]
