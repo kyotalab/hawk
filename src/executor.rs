@@ -184,12 +184,12 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
                             results.append(&mut item_results);
                         }
                     }
-                    return Ok(results);
+                    Ok(results)
                 } else {
-                    return Ok(sliced);
+                    Ok(sliced)
                 }
             } else {
-                return Err(Error::InvalidQuery(format!("Field '{}' is not an array", key)));
+                Err(Error::InvalidQuery(format!("Field '{}' is not an array", key)))
             }
         }
         else if bracket_content.is_empty() {
@@ -209,16 +209,14 @@ pub fn execute_basic_query_as_json(json: &Value, query: &str) -> Result<Vec<Valu
         // 単一オブジェクトのフィールドアクセス対応
         if !fields.is_empty() {
             if let Some(first_value) = json.get(segment) {
-                return handle_nested_field_access(first_value, fields);
+                handle_nested_field_access(first_value, fields)
             } else {
-                return Err(Error::InvalidQuery(format!("Field '{}' not found", segment)));
+                Err(Error::InvalidQuery(format!("Field '{}' not found", segment)))
             }
+        } else if let Some(field_value) = json.get(segment) {
+            Ok(vec![field_value.clone()])
         } else {
-            if let Some(field_value) = json.get(segment) {
-                return Ok(vec![field_value.clone()]);
-            } else {
-                return Err(Error::InvalidQuery(format!("Field '{}' not found", segment)));
-            }
+            Err(Error::InvalidQuery(format!("Field '{}' not found", segment)))
         }
     }
 }

@@ -39,7 +39,7 @@ pub fn apply_string_operation(value: &Value, operation: &str) -> Result<Value, E
             
             // パイプ区切りでOR条件をサポート
             if pattern.contains('|') {
-                apply_contains_or_condition(&string_val, &pattern)
+                apply_contains_or_condition(string_val, &pattern)
             } else {
                 Ok(Value::Bool(string_val.contains(&pattern)))
             }
@@ -51,7 +51,7 @@ pub fn apply_string_operation(value: &Value, operation: &str) -> Result<Value, E
             let pattern = extract_string_argument(op)?;
             
             if pattern.contains('|') {
-                apply_starts_with_or_condition(&string_val, &pattern)
+                apply_starts_with_or_condition(string_val, &pattern)
             } else {
                 Ok(Value::Bool(string_val.starts_with(&pattern)))
             }
@@ -63,7 +63,7 @@ pub fn apply_string_operation(value: &Value, operation: &str) -> Result<Value, E
             let pattern = extract_string_argument(op)?;
             
             if pattern.contains('|') {
-                apply_ends_with_or_condition(&string_val, &pattern)
+                apply_ends_with_or_condition(string_val, &pattern)
             } else {
                 Ok(Value::Bool(string_val.ends_with(&pattern)))
             }
@@ -440,7 +440,7 @@ fn parse_slice_notation_for_split(slice_str: &str, array_len: usize) -> Result<(
         let neg_idx = parts[0][1..].parse::<usize>().map_err(|_| {
             Error::StringOperation(format!("Invalid negative index: {}", parts[0]))
         })?;
-        Some(if neg_idx > array_len { 0 } else { array_len - neg_idx })
+        Some(array_len.saturating_sub(neg_idx))
     } else {
         Some(parts[0].parse::<usize>().map_err(|_| {
             Error::StringOperation(format!("Invalid start index: {}", parts[0]))
@@ -454,7 +454,7 @@ fn parse_slice_notation_for_split(slice_str: &str, array_len: usize) -> Result<(
         let neg_idx = parts[1][1..].parse::<usize>().map_err(|_| {
             Error::StringOperation(format!("Invalid negative index: {}", parts[1]))
         })?;
-        Some(if neg_idx > array_len { 0 } else { array_len - neg_idx })
+        Some(array_len.saturating_sub(neg_idx))
     } else {
         Some(parts[1].parse::<usize>().map_err(|_| {
             Error::StringOperation(format!("Invalid end index: {}", parts[1]))
