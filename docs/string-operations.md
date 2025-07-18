@@ -142,7 +142,6 @@ hawk '.posts[] | map(.title, .content | length)' posts.json
 ### Example: User Data Processing
 
 ```json
-// Input
 {
   "users": [
     {
@@ -157,7 +156,7 @@ hawk '.posts[] | map(.title, .content | length)' posts.json
 
 ```bash
 # Process multiple fields simultaneously
-hawk '.users[] | map(.name, .department | upper)' users.json
+hawk --format json '.users[] | map(.name, .department | upper)' users.json
 
 # Result
 {

@@ -68,7 +68,6 @@ hawk '.[] | select(.email | contains("@")) | count' users.csv
 Let's work with a sample sales dataset:
 
 ```json
-// sales_data.json
 {
   "sales": [
     {
@@ -115,7 +114,7 @@ Let's work with a sample sales dataset:
 
 ```bash
 # Total sales count
-hawk '.sales | count' sales_data.json
+hawk '.sales[] | count' sales_data.json
 
 # Total revenue
 hawk '.sales[] | sum(.amount)' sales_data.json
@@ -154,9 +153,6 @@ hawk '.[] | .field | sort' data.json           # All values sorted
 ```bash
 # Quartile analysis (using slicing)
 hawk '.[] | sort(.price) | length' products.json  # Get total count
-
-# Percentile calculations
-hawk '.[] | sort(.score) | .[90%:]' results.json      # Top 10%
 
 # Range analysis
 hawk '.[] | select(.price >= 100) | select(.price <= 500) | count' products.json
@@ -295,9 +291,6 @@ hawk '.[] | map(.field // "default_value")' data.json  # Replace nulls
 ### Feature Engineering
 
 ```bash
-# Create calculated fields
-hawk '.[] | map(.total_amount = .price * .quantity)' orders.json
-
 # Extract date components
 hawk '.[] | map(.year | split("-")[0])' events.json
 hawk '.[] | map(.month | split("-")[1])' events.json
@@ -309,14 +302,8 @@ hawk '.[] | select(.age >= 18) | select(.age < 65) | map(.age_group = "adult")' 
 ### Data Reshaping
 
 ```bash
-# Flatten nested data
-hawk '.[] | .nested_field[]' complex_data.json
-
 # Extract specific fields
 hawk '.[] | select_fields(id,name,email)' users.json
-
-# Combine fields
-hawk '.[] | map(.full_name | .first_name + " " + .last_name)' people.json
 ```
 
 ## Time Series Analysis
@@ -510,9 +497,6 @@ hawk '.[] | select(.response_time > baseline * 2)' current.json  # 2x baseline
 ### Data Export Formats
 
 ```bash
-# Export to CSV
-hawk '.results[]' --format csv > analysis_results.csv
-
 # Export to JSON
 hawk '.summary' --format json > summary_report.json
 
@@ -528,9 +512,6 @@ echo "=== Sales Summary ===" > report.txt
 hawk '.[] | sum(.amount)' sales.json >> report.txt
 hawk '.[] | avg(.amount)' sales.json >> report.txt
 hawk '.[] | count' sales.json >> report.txt
-
-# Performance report
-hawk '.[] | group_by(.service) | avg(.response_time)' --format table > performance_report.txt
 ```
 
 ## Best Practices

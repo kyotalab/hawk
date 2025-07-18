@@ -156,7 +156,7 @@ EOF
 
 ```bash
 # See all names
-hawk '.[] | .name' employees.csv
+hawk '.[].name' employees.csv
 
 # Find engineers
 hawk '.[] | select(.department == "Engineering")' employees.csv
@@ -194,9 +194,6 @@ hawk -t '. | map(. | split(" ")[0])' app.log
 
 # Extract log levels
 hawk -t '. | map(. | split(" ")[2])' app.log
-
-# Count error types
-hawk -t '. | select(. | contains("ERROR")) | map(. | split(" ")[2]) | group_by(.) | count' app.log
 ```
 
 ## 🔧 String Operations
@@ -232,10 +229,6 @@ hawk '.users[0].name' users.json
 # Array of objects → table format
 hawk '.users[]' users.json
 # Output: Formatted table with columns
-
-# Complex data → JSON format
-hawk '.users[0]' users.json
-# Output: Pretty-printed JSON
 ```
 
 You can force specific formats:
