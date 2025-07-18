@@ -209,7 +209,7 @@ hawk -t '. | select(. | upper | contains("ERROR"))' logs.txt
 hawk -t '. | select(. | contains("ERROR") | . | contains("WARN"))' logs.txt
 
 # Exclude patterns
-hawk -t '. | select(. | contains("INFO") | not)' logs.txt
+hawk -t '. | select(not (. | contains("INFO"))' logs.txt
 ```
 
 ### Advanced Pattern Matching
@@ -239,7 +239,7 @@ hawk -t '. | select(. | contains("ERROR"))' app.log
 hawk -t '. | select(. | contains("FATAL"))' app.log
 
 # Severity filtering (ERROR and above)
-hawk -t '. | select(. | contains("ERROR") | . | contains("FATAL"))' app.log
+hawk -t '. | select(. | contains("ERROR|FATAL"))' app.log
 
 # Time-based filtering
 hawk -t '. | select(. | starts_with("2024-01-15"))' dated_logs.txt
@@ -261,7 +261,7 @@ hawk -t '. | map(. | split(" ")[0])' access.log
 hawk -t '. | map(. | split("\"")[1] | split(" ")[0])' access.log
 
 # Extract file paths
-hawk -t '. | map(. | split("/") | last)' file_paths.txt
+hawk -t '. | map(. | split("/")[-1])' file_paths.txt
 
 # Extract domains from URLs
 hawk -t '. | map(. | split("://")[1] | split("/")[0])' urls.txt
@@ -409,9 +409,6 @@ hawk -t '.[0:10000] | select(. | contains("ERROR"))' huge.log
 
 # ✅ Sample large datasets
 hawk -t '.[::100] | map(. | split(" ")[0])' massive.log  # Every 100th line
-
-# ✅ Use appropriate data types
-hawk -t '. | select(. | length > 0)' text.txt           # String operations
 ```
 
 ### Slicing for Performance (NEW!)
