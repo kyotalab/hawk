@@ -376,5 +376,4 @@ Happy data exploring! 🦅
 **Quick Links:**
 
 - [String Operations](string-operations.md) - Text processing guide
-- [Examples](examples/) - Real-world use cases
-- [Troubleshooting](advanced/troubleshooting.md) - Common issues and solutions
+- [Examples](../examples/README.md) - Real-world use cases
