@@ -5,6 +5,9 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Crates.io](https://img.shields.io/crates/v/hawk-data.svg)](https://crates.io/crates/hawk-data)
+[![Crates.io](https://img.shields.io/crates/d/hawk-data.svg)](https://crates.io/crates/hawk-data)
+[![GitHub Stars](https://img.shields.io/github/stars/kyotalab/hawk.svg)](https://github.com/kyotalab/hawk/stargazers)
+[![GitHub Release](https://img.shields.io/github/release/kyotalab/hawk.svg)](https://github.com/kyotalab/hawk/releases)
 
 hawk combines the simplicity of `awk` with the power of `pandas`, bringing unified data processing to your command line. Process any data format with the same intuitive syntax.
 
