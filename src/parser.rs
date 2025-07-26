@@ -34,7 +34,6 @@ pub fn parse_query_segments(query: &str) -> Result<(&str, Vec<&str>), Error> {
         .ok_or(Error::InvalidQuery("Missing field segment in query".into()))?;
     let fields: Vec<&str> = segments.collect();
 
-    
     // println!("Normal parse result: {:?}", result);
     Ok((segment, fields))
 }
@@ -111,7 +110,6 @@ mod tests {
             _ => panic!("Expected InvalidQuery error"),
         }
     }
-
 
     #[test]
     fn test_parse_query_segments_empty_query() {

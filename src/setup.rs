@@ -73,14 +73,17 @@ fn detect_input_format(content: &str) -> InputFormat {
 // 構造化されたYAMLかどうかを厳格に判定
 fn is_structured_yaml(content: &str) -> bool {
     let lines: Vec<&str> = content.lines().collect();
-    
+
     if lines.is_empty() {
         return false;
     }
 
     // Kubernetes/Docker Compose等の明確なYAMLマーカー
-    if content.contains("apiVersion:") || content.contains("kind:") 
-       || content.contains("version:") || content.contains("services:") {
+    if content.contains("apiVersion:")
+        || content.contains("kind:")
+        || content.contains("version:")
+        || content.contains("services:")
+    {
         return true;
     }
 
@@ -89,12 +92,12 @@ fn is_structured_yaml(content: &str) -> bool {
 
     for line in lines {
         let trimmed = line.trim();
-        
+
         // 空行やコメントは除外
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
-        
+
         total_meaningful_lines += 1;
 
         // YAML構造の特徴を検出
@@ -140,12 +143,13 @@ fn is_valid_yaml_line(line: &str) -> bool {
         }
 
         // 値が明らかにYAML的
-        if value_part.is_empty() 
-           || value_part.starts_with('[') 
-           || value_part.starts_with('{')
-           || value_part == "true" 
-           || value_part == "false" 
-           || value_part.parse::<f64>().is_ok() {
+        if value_part.is_empty()
+            || value_part.starts_with('[')
+            || value_part.starts_with('{')
+            || value_part == "true"
+            || value_part == "false"
+            || value_part.parse::<f64>().is_ok()
+        {
             return true;
         }
 
@@ -182,7 +186,7 @@ fn parse_text_to_json(content: &str) -> Result<Value, Error> {
         .lines()
         .map(|line| Value::String(line.to_string()))
         .collect();
-    
+
     // 空のファイルの場合も配列として返す
     Ok(Value::Array(lines))
 }
@@ -305,30 +309,37 @@ mod tests {
     fn test_text_parsing() {
         let content = "line1\nline2\nERROR: something happened";
         let result = parse_text_to_json(content).unwrap();
-        
+
         if let Value::Array(lines) = result {
             assert_eq!(lines.len(), 3);
             assert_eq!(lines[0], Value::String("line1".to_string()));
             assert_eq!(lines[1], Value::String("line2".to_string()));
-            assert_eq!(lines[2], Value::String("ERROR: something happened".to_string()));
+            assert_eq!(
+                lines[2],
+                Value::String("ERROR: something happened".to_string())
+            );
         } else {
             panic!("Expected array result");
         }
     }
-    
+
     #[test]
     fn test_yaml_detection() {
         use super::{is_structured_yaml, is_valid_yaml_line};
-        
+
         // 明確にYAMLとして認識されるべき
         assert!(is_structured_yaml("apiVersion: v1\nkind: Pod"));
-        assert!(is_structured_yaml("key: value\nother: data\nnested:\n  sub: item"));
-        
+        assert!(is_structured_yaml(
+            "key: value\nother: data\nnested:\n  sub: item"
+        ));
+
         // YAMLとして認識されないべき
         assert!(!is_structured_yaml("2024-01-01 10:00:00 INFO Starting"));
         assert!(!is_structured_yaml("plain text\nwith some: colons"));
-        assert!(!is_structured_yaml("ServerName: localhost\nServerPort: 8080")); // 設定ファイル風だがYAMLではない
-        
+        assert!(!is_structured_yaml(
+            "ServerName: localhost\nServerPort: 8080"
+        )); // 設定ファイル風だがYAMLではない
+
         // 個別行のテスト
         assert!(is_valid_yaml_line("key: value"));
         assert!(is_valid_yaml_line("  nested: item"));

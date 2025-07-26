@@ -2,7 +2,7 @@ use indexmap::IndexSet;
 use serde_json::Value;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
-use crate::{value_to_string, Error, OutputFormat};
+use crate::{Error, OutputFormat, value_to_string};
 
 #[derive(Debug)]
 enum DataType {
@@ -429,7 +429,7 @@ fn print_colored_csv_row(
     colors: &ColorScheme,
 ) -> Result<(), Error> {
     let mut first = true;
-    
+
     for (i, value_str) in row_values.iter().enumerate() {
         if !first {
             print!(",");
@@ -468,21 +468,15 @@ fn print_plain_csv(data: &[Value], fields: &[String]) {
 
 /// CSV行を出力する（CSVエスケープ処理付き）
 fn print_csv_row(values: &[String]) {
-    let escaped_values: Vec<String> = values
-        .iter()
-        .map(|value| escape_csv_value(value))
-        .collect();
-    
+    let escaped_values: Vec<String> = values.iter().map(|value| escape_csv_value(value)).collect();
+
     println!("{}", escaped_values.join(","));
 }
 
 /// CSV値をエスケープしてカンマで結合
 fn escape_and_join_csv_row(values: &[String]) -> String {
-    let escaped_values: Vec<String> = values
-        .iter()
-        .map(|value| escape_csv_value(value))
-        .collect();
-    
+    let escaped_values: Vec<String> = values.iter().map(|value| escape_csv_value(value)).collect();
+
     escaped_values.join(",")
 }
 
@@ -490,15 +484,15 @@ fn escape_and_join_csv_row(values: &[String]) -> String {
 fn escape_csv_value(value: &str) -> String {
     // CSVエスケープが必要な条件：
     // 1. カンマが含まれている
-    // 2. ダブルクォートが含まれている  
+    // 2. ダブルクォートが含まれている
     // 3. 改行が含まれている
     // 4. 先頭または末尾にスペースがある
-    
-    let needs_quoting = value.contains(',') 
-        || value.contains('"') 
-        || value.contains('\n') 
+
+    let needs_quoting = value.contains(',')
+        || value.contains('"')
+        || value.contains('\n')
         || value.contains('\r')
-        || value.starts_with(' ') 
+        || value.starts_with(' ')
         || value.ends_with(' ')
         || value.is_empty(); // 空文字列も引用符で囲む
 
