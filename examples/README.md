@@ -55,7 +55,7 @@ hawk '.[] | count' customers.json
 
 # Simple filtering
 hawk '.[] | select(.country == "USA")' customers.json
-hawk '.[] | select(.price > 100)' products.yaml
+hawk '.products[] | select(.price > 100)' products.yaml
 ```
 
 ### Level 2: Aggregation and Grouping
@@ -63,7 +63,7 @@ hawk '.[] | select(.price > 100)' products.yaml
 ```bash
 # Aggregation functions
 hawk '.[] | sum(.lifetime_value)' customers.json
-hawk '.[] | avg(.price)' products.yaml
+hawk '.products[] | avg(.price)' products.yaml
 
 # Grouping
 hawk '.[] | group_by(.country) | count' customers.json
@@ -82,8 +82,7 @@ hawk '.[] | select(.segment | contains("enterprise|business"))' customers.json
 hawk -t '. | select(. | contains("ERROR|FATAL|CRITICAL"))' application.log
 
 # Array slicing
-hawk '.[]' customers.json | hawk '.[0:5]'        # First 5 records
-hawk '.[]' customers.json | hawk '.[-3:]'        # Last 3 records
+hawk '.[0:5]' customers.json        # First 5 records
 ```
 
 ### Level 4: Complex Text Processing
@@ -91,7 +90,6 @@ hawk '.[]' customers.json | hawk '.[-3:]'        # Last 3 records
 ```bash
 # Log analysis
 hawk -t '. | map(. | split(" ")[0:3] | join(" "))' application.log
-hawk -t '. | select(. | contains("ERROR")) | map(. | split(" ")[-1])' application.log
 
 # URL processing
 hawk -t '. | map(. | split("://")[1] | split("/")[0])' urls.txt
@@ -111,7 +109,7 @@ hawk '.[] | select(.status == "active") | select(not (.segment == "test")) | gro
 hawk -t '. | select(. | contains("ERROR|WARN")) | map(. | split(" ")[0:2] | join(" ")) | unique' application.log
 
 # Slicing with aggregation
-hawk '.[]' user_behavior.json | hawk '.[0:10] | avg(.duration_seconds)'
+hawk '.[0:10] | avg(.duration_seconds)' user_behavior.json
 ```
 
 ## 🛠️ Larger Datasets
@@ -134,9 +132,6 @@ hawk '.[] | group_by(.country) | count' large/customers_large.json
 ### Business Analytics
 
 ```bash
-# Customer segment analysis
-hawk '.[] | group_by(.segment) | {segment: .group, avg_value: (.items | avg(.lifetime_value)), count: (.items | count)}' customers.json
-
 # Sales trends (by month)
 hawk '.[] | map(.order_date | split("-")[0:2] | join("-")) | group_by(.) | sum(.price)' orders.csv
 ```
@@ -154,9 +149,6 @@ hawk -t '. | select(. | contains("ERROR")) | map(. | split(" ")[0:2] | join(" ")
 ### Data Cleaning
 
 ```bash
-# Detect duplicate email addresses
-hawk '.[] | group_by(.email) | select(.items | count > 1)' customers.json
-
 # Filter out invalid data
 hawk '.[] | select(not (.email | contains("test|demo|temp"))) | select(.lifetime_value > 0)' customers.json
 ```
