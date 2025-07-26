@@ -96,6 +96,9 @@ pub fn format_output(data: &[Value], format: OutputFormat) -> Result<(), Error> 
             // 明示的にリスト出力
             print_as_list(data, use_colors)?;
         }
+        OutputFormat::Csv => {
+            print_as_csv(data, use_colors)?;
+        }
         OutputFormat::Auto => {
             // 既存のスマート判定ロジック
             match analyze_data_structure(data) {
@@ -369,6 +372,142 @@ fn print_colored_json_value(
     }
 
     Ok(())
+}
+
+fn print_as_csv(data: &[Value], use_colors: bool) -> Result<(), Error> {
+    if data.is_empty() {
+        return Ok(());
+    }
+
+    // 1. 全オブジェクトからフラット化されたフィールド名を収集
+    let mut all_fields = IndexSet::new();
+    for item in data {
+        collect_flattened_fields_ordered(item, "", &mut all_fields);
+    }
+
+    let fields: Vec<String> = all_fields.into_iter().collect();
+
+    if use_colors {
+        print_colored_csv(data, &fields)?;
+    } else {
+        print_plain_csv(data, &fields);
+    }
+
+    Ok(())
+}
+
+fn print_colored_csv(data: &[Value], fields: &[String]) -> Result<(), Error> {
+    let mut stdout = StandardStream::stdout(ColorChoice::Always);
+    let colors = ColorScheme::new();
+
+    // 2. ヘッダー出力（色付き）
+    stdout.set_color(&colors.header)?;
+    let header_row = escape_and_join_csv_row(fields);
+    print!("{}", header_row);
+    stdout.reset()?;
+    println!();
+
+    // 3. データ行出力（色付き）
+    for item in data {
+        let row_values: Vec<String> = fields
+            .iter()
+            .map(|field| get_flattened_value(item, field))
+            .collect();
+
+        print_colored_csv_row(item, fields, &row_values, &mut stdout, &colors)?;
+    }
+
+    Ok(())
+}
+
+/// Color付きCSV行出力
+fn print_colored_csv_row(
+    item: &Value,
+    fields: &[String],
+    row_values: &[String],
+    stdout: &mut StandardStream,
+    colors: &ColorScheme,
+) -> Result<(), Error> {
+    let mut first = true;
+    
+    for (i, value_str) in row_values.iter().enumerate() {
+        if !first {
+            print!(",");
+        }
+        first = false;
+
+        // 値の型に応じて色を設定
+        let field = &fields[i];
+        let value = get_field_value_for_coloring(item, field);
+        let color = get_color_for_value(&value, colors);
+
+        stdout.set_color(color)?;
+        let escaped_value = escape_csv_value(value_str);
+        print!("{}", escaped_value);
+        stdout.reset()?;
+    }
+    println!();
+
+    Ok(())
+}
+
+/// Plain CSV出力
+fn print_plain_csv(data: &[Value], fields: &[String]) {
+    // 2. ヘッダー出力
+    print_csv_row(fields);
+
+    // 3. データ行出力
+    for item in data {
+        let row_values: Vec<String> = fields
+            .iter()
+            .map(|field| get_flattened_value(item, field))
+            .collect();
+        print_csv_row(&row_values);
+    }
+}
+
+/// CSV行を出力する（CSVエスケープ処理付き）
+fn print_csv_row(values: &[String]) {
+    let escaped_values: Vec<String> = values
+        .iter()
+        .map(|value| escape_csv_value(value))
+        .collect();
+    
+    println!("{}", escaped_values.join(","));
+}
+
+/// CSV値をエスケープしてカンマで結合
+fn escape_and_join_csv_row(values: &[String]) -> String {
+    let escaped_values: Vec<String> = values
+        .iter()
+        .map(|value| escape_csv_value(value))
+        .collect();
+    
+    escaped_values.join(",")
+}
+
+/// CSV値をエスケープする
+fn escape_csv_value(value: &str) -> String {
+    // CSVエスケープが必要な条件：
+    // 1. カンマが含まれている
+    // 2. ダブルクォートが含まれている  
+    // 3. 改行が含まれている
+    // 4. 先頭または末尾にスペースがある
+    
+    let needs_quoting = value.contains(',') 
+        || value.contains('"') 
+        || value.contains('\n') 
+        || value.contains('\r')
+        || value.starts_with(' ') 
+        || value.ends_with(' ')
+        || value.is_empty(); // 空文字列も引用符で囲む
+
+    if needs_quoting {
+        // ダブルクォートをエスケープ（" → ""）してから全体を引用符で囲む
+        format!("\"{}\"", value.replace('"', "\"\""))
+    } else {
+        value.to_string()
+    }
 }
 
 fn print_as_table(data: &[Value], use_colors: bool) -> Result<(), Error> {

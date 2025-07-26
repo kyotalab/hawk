@@ -127,6 +127,201 @@ fn parse_not_condition_with_parentheses(condition: &str) -> Result<(String, bool
     }
 }
 
+fn parse_multi_field_spec(field_spec: &str) -> Vec<String> {
+    if field_spec.contains(',') {
+        // カンマ区切りの複数フィールド
+        field_spec
+            .split(',')
+            .map(|s| {
+                let trimmed = s.trim();
+                if trimmed == "." {
+                    ".".to_string()
+                } else {
+                    trimmed.trim_start_matches('.').to_string()
+                }
+            })
+            .collect()
+    } else {
+        // 単一フィールド（従来の動作）
+        let field_name = if field_spec == "." {
+            ".".to_string()
+        } else {
+            field_spec.trim_start_matches('.').to_string()
+        };
+        vec![field_name]
+    }
+}
+
+/// 複数フィールド対応の集約関数（非グループ化データ用）
+fn apply_multi_field_aggregation(
+    data: Vec<Value>,
+    operation: &str,
+    field_spec: &str,
+) -> Result<Vec<Value>, Error> {
+    let field_names = parse_multi_field_spec(field_spec);
+    
+    if field_names.len() == 1 {
+        // 単一フィールドの場合は従来の実装を使用
+        apply_single_field_aggregation(data, operation, &field_names[0])
+    } else {
+        // 複数フィールドの場合
+        let mut result_obj = serde_json::Map::new();
+        
+        for field_name in field_names {
+            let field_result = apply_single_field_aggregation(data.clone(), operation, &field_name)?;
+            let field_key = if field_name == "." {
+                format!("{}_root", operation)
+            } else {
+                format!("{}_{}", operation, field_name)
+            };
+            
+            if let Some(value) = field_result.first() {
+                result_obj.insert(field_key, value.clone());
+            }
+        }
+        
+        Ok(vec![Value::Object(result_obj)])
+    }
+}
+
+/// 単一フィールドの集約処理（従来の実装）
+fn apply_single_field_aggregation(
+    data: Vec<Value>,
+    operation: &str,
+    field_name: &str,
+) -> Result<Vec<Value>, Error> {
+    match operation {
+        "sum" => {
+            let sum: f64 = if field_name == "." {
+                data.iter().filter_map(|val| val.as_f64()).sum()
+            } else {
+                data.iter()
+                    .filter_map(|item| item.get(field_name))
+                    .filter_map(|val| val.as_f64())
+                    .sum()
+            };
+            
+            let round_sum = if sum.fract() == 0.0 { sum } else { (sum * 10.0).round() / 10.0 };
+            Ok(vec![Value::Number(serde_json::Number::from_f64(round_sum).unwrap())])
+        }
+        "avg" => {
+            let values: Vec<f64> = if field_name == "." {
+                data.iter().filter_map(|val| val.as_f64()).collect()
+            } else {
+                data.iter()
+                    .filter_map(|item| item.get(field_name))
+                    .filter_map(|val| val.as_f64())
+                    .collect()
+            };
+            
+            if values.is_empty() {
+                Ok(vec![Value::Null])
+            } else {
+                let avg = values.iter().sum::<f64>() / values.len() as f64;
+                let round_avg = (avg * 10.0).round() / 10.0;
+                Ok(vec![Value::Number(serde_json::Number::from_f64(round_avg).unwrap())])
+            }
+        }
+        "min" => {
+            let min_val = if field_name == "." {
+                data.iter()
+                    .filter_map(|val| val.as_f64())
+                    .fold(f64::INFINITY, f64::min)
+            } else {
+                data.iter()
+                    .filter_map(|item| item.get(field_name))
+                    .filter_map(|val| val.as_f64())
+                    .fold(f64::INFINITY, f64::min)
+            };
+            
+            if min_val == f64::INFINITY {
+                Ok(vec![Value::Null])
+            } else {
+                Ok(vec![Value::Number(serde_json::Number::from_f64(min_val).unwrap())])
+            }
+        }
+        "max" => {
+            let max_val = if field_name == "." {
+                data.iter()
+                    .filter_map(|val| val.as_f64())
+                    .fold(f64::NEG_INFINITY, f64::max)
+            } else {
+                data.iter()
+                    .filter_map(|item| item.get(field_name))
+                    .filter_map(|val| val.as_f64())
+                    .fold(f64::NEG_INFINITY, f64::max)
+            };
+            
+            if max_val == f64::NEG_INFINITY {
+                Ok(vec![Value::Null])
+            } else {
+                Ok(vec![Value::Number(serde_json::Number::from_f64(max_val).unwrap())])
+            }
+        }
+        _ => Err(Error::InvalidQuery(format!("Unsupported operation: {}", operation))),
+    }
+}
+
+/// 複数フィールド対応の集約関数（グループ化データ用）
+fn apply_multi_field_aggregation_to_groups(
+    data: Vec<Value>,
+    operation: &str,
+    field_spec: &str,
+) -> Result<Vec<Value>, Error> {
+    let field_names = parse_multi_field_spec(field_spec);
+    let mut results = Vec::new();
+
+    for group_data in data {
+        if let Value::Object(group_obj) = group_data {
+            let group_name = group_obj.get("group").unwrap();
+            let items = group_obj.get("items").and_then(|v| v.as_array()).unwrap();
+
+            if field_names.len() == 1 {
+                // 単一フィールドの場合（従来の動作）
+                let aggregated_value = apply_single_field_aggregation_to_group(items, operation, &field_names[0])?;
+                
+                let mut result_obj = serde_json::Map::new();
+                result_obj.insert("group".to_string(), group_name.clone());
+                result_obj.insert(operation.to_string(), aggregated_value);
+                results.push(Value::Object(result_obj));
+            } else {
+                // 複数フィールドの場合
+                let mut result_obj = serde_json::Map::new();
+                result_obj.insert("group".to_string(), group_name.clone());
+                
+                for field_name in &field_names {
+                    let aggregated_value = apply_single_field_aggregation_to_group(items, operation, field_name)?;
+                    let field_key = if field_name == "." {
+                        format!("{}_root", operation)
+                    } else {
+                        format!("{}_{}", operation, field_name)
+                    };
+                    result_obj.insert(field_key, aggregated_value);
+                }
+                
+                results.push(Value::Object(result_obj));
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// 単一フィールドのグループ集約処理
+fn apply_single_field_aggregation_to_group(
+    items: &[Value],
+    operation: &str,
+    field_name: &str,
+) -> Result<Value, Error> {
+    match operation {
+        "sum" => calculate_sum(items, field_name),
+        "avg" => calculate_avg(items, field_name),
+        "min" => calculate_min(items, field_name),
+        "max" => calculate_max(items, field_name),
+        _ => Ok(Value::Null),
+    }
+}
+
 pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec<Value>, Error> {
     let trimmed_op = operation.trim();
 
@@ -162,96 +357,45 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         print_data_info(&data);
         Ok(vec![]) // Return empty vector
     } else if trimmed_op.starts_with("sum(") && trimmed_op.ends_with(")") {
-        // sum(.field) の処理
-        let field = &trimmed_op[4..trimmed_op.len() - 1];
-        let field_name = field.trim_start_matches('.');
-
+        let field_spec = &trimmed_op[4..trimmed_op.len() - 1];
+        
         if is_grouped_data(&data) {
-            apply_aggregation_to_groups(data, "sum", field_name)
+            apply_multi_field_aggregation_to_groups(data, "sum", field_spec)
         } else {
-            let sum: f64 = data
-                .iter()
-                .filter_map(|item| item.get(field_name))
-                .filter_map(|val| val.as_f64())
-                .sum();
-
-            let round_sum = if sum.fract() == 0.0 {
-                sum
-            } else {
-                (sum * 10.0).round() / 10.0
-            };
-            let sum_value = Value::Number(serde_json::Number::from_f64(round_sum).unwrap());
-            Ok(vec![sum_value])
+            apply_multi_field_aggregation(data, "sum", field_spec)
         }
     } else if trimmed_op.starts_with("avg(") && trimmed_op.ends_with(")") {
-        // avg(.field) の処理
-        let field = &trimmed_op[4..trimmed_op.len() - 1];
-        let field_name = field.trim_start_matches('.');
-
+        let field_spec = &trimmed_op[4..trimmed_op.len() - 1];
+        
         if is_grouped_data(&data) {
-            apply_aggregation_to_groups(data, "avg", field_name)
+            apply_multi_field_aggregation_to_groups(data, "avg", field_spec)
         } else {
-            let values: Vec<f64> = data
-                .iter()
-                .filter_map(|item| item.get(field_name))
-                .filter_map(|val| val.as_f64())
-                .collect();
-
-            if values.is_empty() {
-                Ok(vec![Value::Null])
-            } else {
-                let avg = values.iter().sum::<f64>() / values.len() as f64;
-                let round_avg = (avg * 10.0).round() / 10.0;
-                let avg_value = Value::Number(serde_json::Number::from_f64(round_avg).unwrap());
-                Ok(vec![avg_value])
-            }
+            apply_multi_field_aggregation(data, "avg", field_spec)
         }
     } else if trimmed_op.starts_with("min(") && trimmed_op.ends_with(")") {
-        // min(.field) の処理
-        let field = &trimmed_op[4..trimmed_op.len() - 1];
-        let field_name = field.trim_start_matches('.');
-
+        let field_spec = &trimmed_op[4..trimmed_op.len() - 1];
+        
         if is_grouped_data(&data) {
-            apply_aggregation_to_groups(data, "min", field_name)
+            apply_multi_field_aggregation_to_groups(data, "min", field_spec)
         } else {
-            let min_val = data
-                .iter()
-                .filter_map(|item| item.get(field_name))
-                .filter_map(|val| val.as_f64())
-                .fold(f64::INFINITY, f64::min);
-
-            if min_val == f64::INFINITY {
-                Ok(vec![Value::Null])
-            } else {
-                let min_value = Value::Number(serde_json::Number::from_f64(min_val).unwrap());
-                Ok(vec![min_value])
-            }
+            apply_multi_field_aggregation(data, "min", field_spec)
         }
     } else if trimmed_op.starts_with("max(") && trimmed_op.ends_with(")") {
-        // max(.field) の処理
-        let field = &trimmed_op[4..trimmed_op.len() - 1];
-        let field_name = field.trim_start_matches('.');
-
+        let field_spec = &trimmed_op[4..trimmed_op.len() - 1];
+        
         if is_grouped_data(&data) {
-            apply_aggregation_to_groups(data, "max", field_name)
+            apply_multi_field_aggregation_to_groups(data, "max", field_spec)
         } else {
-            let max_val = data
-                .iter()
-                .filter_map(|item| item.get(field_name))
-                .filter_map(|val| val.as_f64())
-                .fold(f64::NEG_INFINITY, f64::max);
-
-            if max_val == f64::NEG_INFINITY {
-                Ok(vec![Value::Null])
-            } else {
-                let max_value = Value::Number(serde_json::Number::from_f64(max_val).unwrap());
-                Ok(vec![max_value])
-            }
+            apply_multi_field_aggregation(data, "max", field_spec)
         }
     } else if trimmed_op.starts_with("group_by(") && trimmed_op.ends_with(")") {
         // group_by(.department) の処理
         let field = &trimmed_op[9..trimmed_op.len() - 1];
-        let field_name = field.trim_start_matches('.');
+        let field_name = if field == "." {
+            "."  // ルート要素の場合はそのまま
+        } else {
+            field.trim_start_matches('.')  // .を除去
+        };
 
         let grouped = group_data_by_field(data, field_name)?;
         Ok(grouped)
@@ -295,14 +439,8 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         }
     } else if trimmed_op.starts_with("sort(") && trimmed_op.ends_with(")") {
         // sort(.field) - フィールド指定
-        let field = &trimmed_op[5..trimmed_op.len() - 1];
-        let field_name = field.trim_start_matches('.');
-        let result = apply_stats_operation(&data, "sort", Some(field_name))?;
-        if let Value::Array(arr) = result {
-            Ok(arr)
-        } else {
-            Ok(vec![result])
-        }
+        let content = &trimmed_op[5..trimmed_op.len() - 1];
+        apply_sort_operation(data, content)
     } else if trimmed_op.starts_with("median(") && trimmed_op.ends_with(")") {
         // median(.field) - フィールド指定
         let field = &trimmed_op[7..trimmed_op.len() - 1];
@@ -326,6 +464,396 @@ pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec
         )))
     }
 }
+
+// pub fn apply_pipeline_operation(data: Vec<Value>, operation: &str) -> Result<Vec<Value>, Error> {
+//     let trimmed_op = operation.trim();
+// 
+//     if operation.starts_with(".[") && operation.ends_with("]") {
+//         return apply_universal_slice_operation(data, operation);
+//     }
+// 
+// 
+//     if trimmed_op.starts_with("select(") && trimmed_op.ends_with(")") {
+//         // フィルタリング操作
+//         apply_simple_filter(data, trimmed_op)
+//     } else if trimmed_op == "count" {
+//         // カウント操作
+//         if is_grouped_data(&data) {
+//             apply_aggregation_to_groups(data, "count", "")
+//         } else {
+//             let count = data.len();
+//             let count_value = Value::Number(serde_json::Number::from(count));
+//             Ok(vec![count_value])
+//         }
+//     } else if trimmed_op.starts_with("map(") && trimmed_op.ends_with(")") {
+//         apply_map_operation(data, trimmed_op)
+//     } else if trimmed_op.starts_with("select_fields(") && trimmed_op.ends_with(")") {
+//         // 複数フィールド選択
+//         let fields_str = &trimmed_op[14..trimmed_op.len() - 1]; // "name,age,department"
+//         let field_list: Vec<String> = fields_str
+//             .split(',')
+//             .map(|s| s.trim().to_string())
+//             .collect();
+// 
+//         apply_field_selection(data, field_list)
+//     } else if trimmed_op == "info" {
+//         // info操作
+//         print_data_info(&data);
+//         Ok(vec![]) // Return empty vector
+//     } else if trimmed_op.starts_with("sum(") && trimmed_op.ends_with(")") {
+//         let field = &trimmed_op[4..trimmed_op.len() - 1];
+//         let field_name = if field == "." {
+//             "."  // ルート要素
+//         } else {
+//             field.trim_start_matches('.')
+//         };
+// 
+//         if is_grouped_data(&data) {
+//             apply_aggregation_to_groups(data, "sum", field_name)
+//         } else {
+//             let sum: f64 = if field_name == "." {
+//                 // ルート要素の場合：各値を数値として扱う
+//                 data.iter()
+//                     .filter_map(|val| val.as_f64())
+//                     .sum()
+//             } else {
+//                 // フィールド指定の場合：既存の実装
+//                 data.iter()
+//                     .filter_map(|item| item.get(field_name))
+//                     .filter_map(|val| val.as_f64())
+//                     .sum()
+//             };
+// 
+//             let round_sum = if sum.fract() == 0.0 {
+//                 sum
+//             } else {
+//                 (sum * 10.0).round() / 10.0
+//             };
+//             let sum_value = Value::Number(serde_json::Number::from_f64(round_sum).unwrap());
+//             Ok(vec![sum_value])
+//         }
+//     } else if trimmed_op.starts_with("avg(") && trimmed_op.ends_with(")") {
+//         // avg(.field) または avg(.) の処理
+//         let field = &trimmed_op[4..trimmed_op.len() - 1];
+//         let field_name = if field == "." {
+//             "."
+//         } else {
+//             field.trim_start_matches('.')
+//         };
+// 
+//         if is_grouped_data(&data) {
+//             apply_aggregation_to_groups(data, "avg", field_name)
+//         } else {
+//             let values: Vec<f64> = if field_name == "." {
+//                 // ルート要素の場合：各値を数値として扱う
+//                 data.iter()
+//                     .filter_map(|val| val.as_f64())
+//                     .collect()
+//             } else {
+//                 // フィールド指定の場合：既存の実装
+//                 data.iter()
+//                     .filter_map(|item| item.get(field_name))
+//                     .filter_map(|val| val.as_f64())
+//                     .collect()
+//             };
+// 
+//             if values.is_empty() {
+//                 Ok(vec![Value::Null])
+//             } else {
+//                 let avg = values.iter().sum::<f64>() / values.len() as f64;
+//                 let round_avg = (avg * 10.0).round() / 10.0;
+//                 let avg_value = Value::Number(serde_json::Number::from_f64(round_avg).unwrap());
+//                 Ok(vec![avg_value])
+//             }
+//         }
+//     } else if trimmed_op.starts_with("min(") && trimmed_op.ends_with(")") {
+//         // min(.field) または min(.) の処理
+//         let field = &trimmed_op[4..trimmed_op.len() - 1];
+//         let field_name = if field == "." {
+//             "."
+//         } else {
+//             field.trim_start_matches('.')
+//         };
+// 
+//         if is_grouped_data(&data) {
+//             apply_aggregation_to_groups(data, "min", field_name)
+//         } else {
+//             let min_val = if field_name == "." {
+//                 // ルート要素の場合：各値を数値として扱う
+//                 data.iter()
+//                     .filter_map(|val| val.as_f64())
+//                     .fold(f64::INFINITY, f64::min)
+//             } else {
+//                 // フィールド指定の場合：既存の実装
+//                 data.iter()
+//                     .filter_map(|item| item.get(field_name))
+//                     .filter_map(|val| val.as_f64())
+//                     .fold(f64::INFINITY, f64::min)
+//             };
+// 
+//             if min_val == f64::INFINITY {
+//                 Ok(vec![Value::Null])
+//             } else {
+//                 let min_value = Value::Number(serde_json::Number::from_f64(min_val).unwrap());
+//                 Ok(vec![min_value])
+//             }
+//         }
+//     } else if trimmed_op.starts_with("max(") && trimmed_op.ends_with(")") {
+//         // max(.field) または max(.) の処理
+//         let field = &trimmed_op[4..trimmed_op.len() - 1];
+//         let field_name = if field == "." {
+//             "."
+//         } else {
+//             field.trim_start_matches('.')
+//         };
+// 
+//         if is_grouped_data(&data) {
+//             apply_aggregation_to_groups(data, "max", field_name)
+//         } else {
+//             let max_val = if field_name == "." {
+//                 // ルート要素の場合：各値を数値として扱う
+//                 data.iter()
+//                     .filter_map(|val| val.as_f64())
+//                     .fold(f64::NEG_INFINITY, f64::max)
+//             } else {
+//                 // フィールド指定の場合：既存の実装
+//                 data.iter()
+//                     .filter_map(|item| item.get(field_name))
+//                     .filter_map(|val| val.as_f64())
+//                     .fold(f64::NEG_INFINITY, f64::max)
+//             };
+// 
+//             if max_val == f64::NEG_INFINITY {
+//                 Ok(vec![Value::Null])
+//             } else {
+//                 let max_value = Value::Number(serde_json::Number::from_f64(max_val).unwrap());
+//                 Ok(vec![max_value])
+//             }
+//         }
+//     } else if trimmed_op.starts_with("group_by(") && trimmed_op.ends_with(")") {
+//         // group_by(.department) の処理
+//         let field = &trimmed_op[9..trimmed_op.len() - 1];
+//         let field_name = if field == "." {
+//             "."  // ルート要素の場合はそのまま
+//         } else {
+//             field.trim_start_matches('.')  // .を除去
+//         };
+// 
+//         let grouped = group_data_by_field(data, field_name)?;
+//         Ok(grouped)
+//     } else if trimmed_op == "unique" {
+//         // unique操作（重複除去）
+//         let result = apply_stats_operation(&data, "unique", None)?;
+//         if let Value::Array(arr) = result {
+//             Ok(arr)
+//         } else {
+//             Ok(vec![result])
+//         }
+//     } else if trimmed_op == "sort" {
+//         // sort操作
+//         let result = apply_stats_operation(&data, "sort", None)?;
+//         if let Value::Array(arr) = result {
+//             Ok(arr)
+//         } else {
+//             Ok(vec![result])
+//         }
+//     } else if trimmed_op == "length" {
+//         // length操作（配列の長さ）
+//         let result = apply_stats_operation(&data, "length", None)?;
+//         Ok(vec![result])
+//     } else if trimmed_op == "median" {
+//         // median操作（中央値）
+//         let result = apply_stats_operation(&data, "median", None)?;
+//         Ok(vec![result])
+//     } else if trimmed_op == "stddev" {
+//         // stddev操作（標準偏差）
+//         let result = apply_stats_operation(&data, "stddev", None)?;
+//         Ok(vec![result])
+//     } else if trimmed_op.starts_with("unique(") && trimmed_op.ends_with(")") {
+//         // unique(.field) - フィールド指定
+//         let field = &trimmed_op[7..trimmed_op.len() - 1];
+//         let field_name = field.trim_start_matches('.');
+//         let result = apply_stats_operation(&data, "unique", Some(field_name))?;
+//         if let Value::Array(arr) = result {
+//             Ok(arr)
+//         } else {
+//             Ok(vec![result])
+//         }
+//     } else if trimmed_op.starts_with("sort(") && trimmed_op.ends_with(")") {
+//         // sort(.field) - フィールド指定
+//         let field = &trimmed_op[5..trimmed_op.len() - 1];
+//         let field_name = field.trim_start_matches('.');
+//         let result = apply_stats_operation(&data, "sort", Some(field_name))?;
+//         if let Value::Array(arr) = result {
+//             Ok(arr)
+//         } else {
+//             Ok(vec![result])
+//         }
+//     } else if trimmed_op.starts_with("median(") && trimmed_op.ends_with(")") {
+//         // median(.field) - フィールド指定
+//         let field = &trimmed_op[7..trimmed_op.len() - 1];
+//         let field_name = field.trim_start_matches('.');
+//         let result = apply_stats_operation(&data, "median", Some(field_name))?;
+//         Ok(vec![result])
+//     } else if trimmed_op.starts_with("stddev(") && trimmed_op.ends_with(")") {
+//         // stddev(.field) - フィールド指定
+//         let field = &trimmed_op[7..trimmed_op.len() - 1];
+//         let field_name = field.trim_start_matches('.');
+//         let result = apply_stats_operation(&data, "stddev", Some(field_name))?;
+//         Ok(vec![result])
+//     } else {
+//         // より詳細なエラーメッセージ
+//         Err(Error::InvalidQuery(format!(
+//             "Unsupported operation: '{}' (length: {}, starts with 'map(': {}, ends with ')': {})",
+//             trimmed_op,
+//             trimmed_op.len(),
+//             trimmed_op.starts_with("map("),
+//             trimmed_op.ends_with(")")
+//         )))
+//     }
+// }
+//
+
+/// ソート操作を処理（昇順・降順対応、グループ化データ対応）
+fn apply_sort_operation(data: Vec<Value>, sort_spec: &str) -> Result<Vec<Value>, Error> {
+    // グループ化データかどうかをチェック
+    if is_grouped_data(&data) {
+        apply_sort_to_grouped_data(data, sort_spec)
+    } else {
+        apply_sort_to_regular_data(data, sort_spec)
+    }
+}
+
+/// 通常データのソート処理
+fn apply_sort_to_regular_data(data: Vec<Value>, sort_spec: &str) -> Result<Vec<Value>, Error> {
+    let (field_name, is_descending) = parse_sort_spec(sort_spec)?;
+    
+    if field_name.is_empty() {
+        // フィールド指定なし：値そのものでソート
+        let mut sorted_data = data;
+        sorted_data.sort_by(|a, b| {
+            let comparison = compare_sort_values(a, b);
+            if is_descending {
+                comparison.reverse()
+            } else {
+                comparison
+            }
+        });
+        Ok(sorted_data)
+    } else {
+        // フィールド指定あり：指定フィールドでソート
+        let mut sorted_data = data;
+        sorted_data.sort_by(|a, b| {
+            let value_a = extract_sort_key(a, &format!(".{}", field_name));
+            let value_b = extract_sort_key(b, &format!(".{}", field_name));
+            let comparison = compare_sort_values(&value_a, &value_b);
+            if is_descending {
+                comparison.reverse()
+            } else {
+                comparison
+            }
+        });
+        Ok(sorted_data)
+    }
+}
+
+/// グループ化データのソート処理
+fn apply_sort_to_grouped_data(data: Vec<Value>, sort_spec: &str) -> Result<Vec<Value>, Error> {
+    let (field_name, is_descending) = parse_sort_spec(sort_spec)?;
+    
+    let mut sorted_data = data;
+    
+    if field_name.is_empty() {
+        // フィールド指定なし：グループ名でソート
+        sorted_data.sort_by(|a, b| {
+            let group_a = a.get("group").unwrap_or(&Value::Null);
+            let group_b = b.get("group").unwrap_or(&Value::Null);
+            let comparison = compare_sort_values(group_a, group_b);
+            if is_descending {
+                comparison.reverse()
+            } else {
+                comparison
+            }
+        });
+    } else {
+        // フィールド指定あり：集約結果のフィールドでソート
+        sorted_data.sort_by(|a, b| {
+            let value_a = extract_aggregation_value(a, &field_name);
+            let value_b = extract_aggregation_value(b, &field_name);
+            let comparison = compare_sort_values(&value_a, &value_b);
+            if is_descending {
+                comparison.reverse()
+            } else {
+                comparison
+            }
+        });
+    }
+    
+    Ok(sorted_data)
+}
+
+/// ソート指定を解析（フィールド名と昇順/降順）
+fn parse_sort_spec(sort_spec: &str) -> Result<(String, bool), Error> {
+    if sort_spec.is_empty() {
+        return Ok((String::new(), false)); // デフォルトは昇順
+    }
+    
+    let parts: Vec<&str> = sort_spec.split(',').map(|s| s.trim()).collect();
+    
+    if parts.len() == 1 {
+        // フィールド名のみ：昇順
+        let field_name = parts[0].trim_start_matches('.').to_string();
+        Ok((field_name, false))
+    } else if parts.len() == 2 {
+        // フィールド名 + 方向指定
+        let field_name = parts[0].trim_start_matches('.').to_string();
+        let direction = parts[1].trim_matches('"').trim_matches('\'');
+        let is_descending = match direction.to_lowercase().as_str() {
+            "desc" | "descending" | "down" => true,
+            "asc" | "ascending" | "up" => false,
+            _ => return Err(Error::InvalidQuery(format!(
+                "Invalid sort direction: '{}'. Use 'asc' or 'desc'", direction
+            ))),
+        };
+        Ok((field_name, is_descending))
+    } else {
+        Err(Error::InvalidQuery(
+            "Invalid sort specification. Use: sort(.field) or sort(.field, \"desc\")".to_string()
+        ))
+    }
+}
+
+/// グループ化データから集約値を抽出
+fn extract_aggregation_value(group_obj: &Value, field_name: &str) -> Value {
+    if let Value::Object(obj) = group_obj {
+        // 集約関数の結果を探す
+        let possible_keys = vec![
+            field_name.to_string(),
+            format!("sum_{}", field_name),
+            format!("avg_{}", field_name),
+            format!("min_{}", field_name),
+            format!("max_{}", field_name),
+            format!("count_{}", field_name),
+            "sum".to_string(),
+            "avg".to_string(),
+            "min".to_string(),
+            "max".to_string(),
+            "count".to_string(),
+        ];
+        
+        for key in possible_keys {
+            if let Some(value) = obj.get(&key) {
+                return value.clone();
+            }
+        }
+        
+        // 見つからない場合はgroup名を返す
+        obj.get("group").cloned().unwrap_or(Value::Null)
+    } else {
+        Value::Null
+    }
+}
+
 
 /// map操作の実装
 fn apply_map_operation(data: Vec<Value>, operation: &str) -> Result<Vec<Value>, Error> {
@@ -516,12 +1044,20 @@ fn group_data_by_field(data: Vec<Value>, field_name: &str) -> Result<Vec<Value>,
 
     let mut groups: HashMap<String, Vec<Value>> = HashMap::new();
 
-    // データをフィールド値でグルーピング
     for item in data {
-        if let Some(field_value) = item.get(field_name) {
-            let key = value_to_string(field_value);
-            groups.entry(key).or_default().push(item);
-        }
+        let key = if field_name == "." {
+            // ルート要素の場合は、値そのものを使用
+            value_to_string(&item)
+        } else {
+            // 通常のフィールドアクセス
+            if let Some(field_value) = item.get(field_name) {
+                value_to_string(field_value)
+            } else {
+                "null".to_string()
+            }
+        };
+        
+        groups.entry(key).or_default().push(item);
     }
 
     // グループを配列として返す
@@ -1078,17 +1614,46 @@ pub fn apply_sort_with_field_operation(
 }
 
 /// ソート用のキー値を抽出
-pub fn extract_sort_key(item: &Value, field_path: &str) -> Value {
-    if field_path.starts_with('.') {
+// pub fn extract_sort_key(item: &Value, field_path: &str) -> Value {
+//     if field_path.starts_with('.') {
+//         let field_name = &field_path[1..];
+//         item.get(field_name).cloned().unwrap_or(Value::Null)
+//     } else {
+//         item.clone()
+//     }
+// }
+
+fn extract_sort_key(item: &Value, field_path: &str) -> Value {
+    if field_path == "." || field_path.is_empty() {
+        item.clone()
+    } else if field_path.starts_with('.') {
         let field_name = &field_path[1..];
         item.get(field_name).cloned().unwrap_or(Value::Null)
     } else {
-        item.clone()
+        item.get(field_path).cloned().unwrap_or(Value::Null)
     }
 }
 
 /// ソート用の値比較
-pub fn compare_sort_values(a: &Value, b: &Value) -> std::cmp::Ordering {
+// pub fn compare_sort_values(a: &Value, b: &Value) -> std::cmp::Ordering {
+//     use std::cmp::Ordering;
+// 
+//     match (a, b) {
+//         (Value::Number(n1), Value::Number(n2)) => {
+//             let f1 = n1.as_f64().unwrap_or(0.0);
+//             let f2 = n2.as_f64().unwrap_or(0.0);
+//             f1.partial_cmp(&f2).unwrap_or(Ordering::Equal)
+//         }
+//         (Value::String(s1), Value::String(s2)) => s1.cmp(s2),
+//         (Value::Bool(b1), Value::Bool(b2)) => b1.cmp(b2),
+//         (Value::Null, Value::Null) => Ordering::Equal,
+//         (Value::Null, _) => Ordering::Less,
+//         (_, Value::Null) => Ordering::Greater,
+//         _ => Ordering::Equal,
+//     }
+// }
+
+fn compare_sort_values(a: &Value, b: &Value) -> std::cmp::Ordering {
     use std::cmp::Ordering;
 
     match (a, b) {
@@ -1102,9 +1667,15 @@ pub fn compare_sort_values(a: &Value, b: &Value) -> std::cmp::Ordering {
         (Value::Null, Value::Null) => Ordering::Equal,
         (Value::Null, _) => Ordering::Less,
         (_, Value::Null) => Ordering::Greater,
-        _ => Ordering::Equal,
+        // 異なる型の場合は文字列化して比較
+        _ => {
+            let s1 = value_to_string(a);
+            let s2 = value_to_string(b);
+            s1.cmp(&s2)
+        }
     }
 }
+
 
 #[cfg(test)]
 mod tests {

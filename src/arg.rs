@@ -132,8 +132,10 @@ pub struct Args {
     ///    json: Force JSON output
     ///
     ///    list: Force list output
+    ///
+    ///    csv: Force CSV output
     #[arg(long, default_value = "auto")]
-    #[arg(value_parser = ["auto", "table", "json", "list"])]
+    #[arg(value_parser = ["auto", "table", "json", "list", "csv"])]
     pub format: String,
 
     #[arg(long, short)]
@@ -147,7 +149,7 @@ pub enum OutputFormat {
     Json,
     Table,
     List,
-    // Csv, // 将来追加
+    Csv,
 }
 
 impl std::str::FromStr for OutputFormat {
@@ -159,7 +161,7 @@ impl std::str::FromStr for OutputFormat {
             "json" => Ok(OutputFormat::Json),
             "table" => Ok(OutputFormat::Table),
             "list" => Ok(OutputFormat::List),
-            // "csv" => Ok(OutputFormat::Csv),
+            "csv" => Ok(OutputFormat::Csv),
             _ => Err(Error::InvalidFormat(format!(
                 "Invalid format: {}. Valid options: auto, json, table, list",
                 s
